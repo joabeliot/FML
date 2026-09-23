@@ -51,6 +51,7 @@ The `api` node's key set has to carry enough to actually send the request:
 |---|---|
 | `method` | GET / POST / PUT / PATCH / DELETE |
 | `path` / `url` | path against `base`, or a full URL |
+| `base` | overrides `@meta base` for this node alone — DONE (2026-09-23), multi-host flows |
 | `header.<Name>` | a request header (repeatable) — needs the kv key charset to allow `.` |
 | `query.<name>` | a query-string param (repeatable) |
 | `body` | request body (JSON) — multi-line body is a `@node` block limitation to solve |

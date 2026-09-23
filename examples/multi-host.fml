@@ -1,0 +1,56 @@
+# multi-host.fml — a flow that spans two services in one file.
+#
+#   node scripts/run.ts examples/multi-host.fml
+#   node scripts/run.ts examples/multi-host.fml --dry     # show the requests, send nothing
+#
+# Real apps rarely live behind one origin — auth is often its own host
+# (auth.example.com), billing another (api.example.com). Before this, an
+# `@node` could only ever hang its `path` off the doc's single `@meta base`,
+# so a flow like that had to be split across files just to change host
+# mid-journey. A `base` key on the node itself overrides `@meta base` for
+# that one call; everything else about it (capture, expect, auth) works the
+# same regardless of which base won.
+#
+# echoUser below proves the actual point, not just the syntax: `username` is
+# captured from jsonplaceholder.typicode.com and spent on httpbin.org — a
+# value threaded across hosts, same as a token captured from an auth service
+# and spent against a billing one.
+
+@meta
+  title: Multi-host demo — a node's own base beats @meta base
+  base: https://jsonplaceholder.typicode.com
+
+@vars
+  userId: 1
+
+@nodes
+  Start     = page
+  getUser   = api
+  echoUser  = api
+  Done      = page
+
+@node getUser {
+  method: GET
+  path: /users/{userId}
+  capture.username: $.username
+  expect: 200
+}
+
+# No `base` here — falls back to `@meta base` above, jsonplaceholder.
+
+@node echoUser {
+  base: https://httpbin.org
+  method: GET
+  path: /get
+  query.user: {username}
+  capture.echoedUser: $.args.user
+  expect: 200
+}
+
+# `base` overrides `@meta base` for this node alone — every other node in
+# the doc still resolves against jsonplaceholder unless it says otherwise.
+
+@flow
+  Start -run> getUser
+  getUser -200> echoUser
+  echoUser -200> Done

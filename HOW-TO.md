@@ -59,10 +59,12 @@ LoginScreen = page   # also a comment (after whitespace)
 
 - `key: value`, indented, one per line — same shape as a `@node` body.
 - **`title:`** names the file (shown in the viewer).
-- **`base:`** is the API root every `api` node's `path:` hangs off. With
-  `base: https://api.example.com` and a node's `path: /auth/login`, the
-  executable form of that call is `https://api.example.com/auth/login`. A node
-  that carries a full `url:` instead ignores `base`.
+- **`base:`** is the API root every `api` node's `path:` hangs off, by
+  default. With `base: https://api.example.com` and a node's
+  `path: /auth/login`, the executable form of that call is
+  `https://api.example.com/auth/login`. A node that carries a full `url:`
+  instead ignores `base` entirely. A single node can also override it with
+  its own `base:` key — see "Multiple hosts in one file" below.
 - Any other key is allowed and carried through untouched; nothing else is
   interpreted today.
 - With multiple `@doc`s, each doc has its own `@meta`.
@@ -212,7 +214,8 @@ sends. See [Running a flow](#running-a-flow) below.
 }
 ```
 
-- `path` resolves against `@meta base:`; `url` is a full URL instead.
+- `path` resolves against `@meta base:` — or the node's own `base:`, see
+  below; `url` is a full URL instead and ignores both.
 - `header.<Name>`, `query.<name>` and `capture.<var>` are **dotted keys** — the
   suffix is the header/param/variable name, so each can appear any number of
   times in one block.
@@ -224,6 +227,49 @@ sends. See [Running a flow](#running-a-flow) below.
 
 `{name}` is also resolved *statically*: click a node and its **About** tab lists
 every variable it references and where the value comes from. See below.
+
+### Multiple hosts in one file
+
+A real app is rarely behind one origin — auth on `auth.example.com`, the API
+proper on `api.example.com`. Put a `base:` key **on the node itself** and it
+overrides `@meta base:` for that one call only; every other node still
+resolves against the doc-level `base`, or its own override if it has one:
+
+```
+@meta
+  base: https://api.example.com
+
+@node sendOtp {
+  base: https://auth.example.com
+  method: POST
+  path: /identity/send_verification_code/
+  body: {"phone": "{phone}"}
+  expect: 200
+}
+
+@node verifyOtp {
+  base: https://auth.example.com
+  method: POST
+  path: /identity/v2/verify_egive_user_phone/
+  body: {"phone": "{phone}", "code": "{otp}"}
+  capture.access: $.access
+  expect: 200
+}
+
+@node checkoutPost {
+  method: POST                       # no base — falls back to @meta base
+  path: /api/v1/billing/checkout/
+  auth: bearer {access}              # token captured on the other host, spent here
+  expect: 201
+}
+```
+
+- `capture`, `expect`, and `auth` all work exactly the same regardless of
+  which base won — the override only changes where the request goes.
+- `--dry` (and every run's step log) prints the fully-resolved `method url`
+  per node, so which base a node actually used is always visible — including
+  on a failure, which is usually a host mismatch, not a broken request. See
+  `examples/multi-host.fml`.
 
 ### Running a flow
 
@@ -295,7 +341,7 @@ status to route on.
 mistakes that only bite once you actually run something:
 
 - a key outside the type's standard (`heder.Accept` silently never sends)
-- `path` with no `@meta base` to resolve against
+- `path` with no `base` (on the node or `@meta`) to resolve against
 - a method that isn't an HTTP verb, an `expect` that isn't a status pattern
 - `capture.x:` with no path — it would never capture anything
 - `{name}`s that are run-time inputs (shown with `--all`)

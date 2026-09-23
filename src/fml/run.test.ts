@@ -126,6 +126,33 @@ function fakeTransport(
   const relativeNoBase = buildRequest({ id: "x", type: "api", data: { path: "/a" } }, {}, {});
   ok("relative path without a base is an error", !!relativeNoBase.error);
 
+  // Multi-host: a node's own `base` overrides `@meta base` — auth on one
+  // service, billing on another, in the same file.
+  const nodeBaseWins = buildRequest(
+    { id: "sendOtp", type: "api", data: { base: "https://auth.example.com", path: "/otp" } },
+    { base: "https://api.example.com" },
+    {},
+  );
+  eq("node base overrides @meta base", nodeBaseWins.request?.url, "https://auth.example.com/otp");
+
+  const nodeBaseFallsBack = buildRequest(
+    { id: "checkout", type: "api", data: { path: "/billing/checkout" } },
+    { base: "https://api.example.com" },
+    {},
+  );
+  eq(
+    "no node base falls back to @meta base",
+    nodeBaseFallsBack.request?.url,
+    "https://api.example.com/billing/checkout",
+  );
+
+  const nodeBaseInterpolated = buildRequest(
+    { id: "x", type: "api", data: { base: "https://{tenant}.example.com", path: "/x" } },
+    {},
+    { tenant: "acme" },
+  );
+  eq("a node base can interpolate {name} too", nodeBaseInterpolated.request?.url, "https://acme.example.com/x");
+
   const json = buildRequest(
     { id: "x", type: "api", data: { method: "POST", url: "https://a.test", body: '{"a":1}' } },
     {},

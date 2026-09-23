@@ -1,13 +1,46 @@
 # Context — F*ML
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre)
-**Phase:** R&D → the north star is real. **Flows execute**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values between calls, asserts `expect`, routes on status — runnable today via `node scripts/run.ts <file.fml>`. Portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
-**Open:** run UI built but **not reviewed by JB** (`feature/run-ui`); api-node *authoring* UI (first-class fields for method/path/header/capture instead of generic kv rows) not started; run targets the active doc only — a bubble's contents aren't runnable, and a `flow` portal isn't stepped into (the routing half of the cross-doc question); cross-doc variable scope still undecided as a *routing* question — does a run step into a `flow` portal's doc? (the variable half dissolved: one run has one flat store); deployed site can only reach CORS-permissive APIs by design (dev proxy is dev-only); bubble contents are read/edit-only, not draggable; node rename + add/delete node/edge (structural — needs an FmlDoc→text serializer); breadcrumb for portal drill-down (the jump itself works); "Open folder" (File System Access API); sidebar resize; label crowding on primary+reciprocal at one node; `#` in a value is still eaten by the comment lexer (JB's call); `public/index.html` is dead Firebase boilerplate; a handful of `lore/` reference docs (`GUARDRAILS.md`, `INDEX.md`, `architecture/*.md`, `ideas/*.md`, `testing/registry.md`) still say "protoArch" here and there — not yet swept, low-stakes
-**Next:** JB to review the run UI; then first-class `api` authoring fields in the property panel
+**Phase:** R&D → the north star is real. **Flows execute**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values between calls, asserts `expect`, routes on status — runnable today via `node scripts/run.ts <file.fml>`. Run UI (canvas-as-test-report, camera-follow) reviewed by JB and shipped. `examples/branching.fml` demonstrates status-based forks. Multi-host per-node `base` override built (`feature/multi-host-base`, not yet reviewed/merged). Portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
+**Open:** multi-host `base` override on `feature/multi-host-base` awaiting JB review before merge; api-node *authoring* UI (first-class fields for method/path/header/capture instead of generic kv rows) not started; run targets the active doc only — a bubble's contents aren't runnable, and a `flow` portal isn't stepped into (the routing half of the cross-doc question); cross-doc variable scope still undecided as a *routing* question — does a run step into a `flow` portal's doc? (the variable half dissolved: one run has one flat store); deployed site can only reach CORS-permissive APIs by design (dev proxy is dev-only); bubble contents are read/edit-only, not draggable; node rename + add/delete node/edge (structural — needs an FmlDoc→text serializer); breadcrumb for portal drill-down (the jump itself works); "Open folder" (File System Access API); sidebar resize; label crowding on primary+reciprocal at one node; `#` in a value is still eaten by the comment lexer (JB's call); `public/index.html` is dead Firebase boilerplate; a handful of `lore/` reference docs (`GUARDRAILS.md`, `INDEX.md`, `architecture/*.md`, `ideas/*.md`, `testing/registry.md`) still say "protoArch" here and there — not yet swept, low-stakes
+**Next:** JB to review the multi-host `base` feature; then first-class `api` authoring fields in the property panel
 
 ---
 
 ## Log
+
+### 2026-09-23 — JB / Claude — Multi-host support
+JB pasted a feature spec from a Stablish fixture he hit running FML for real:
+one file, two services (`auth.stablishdev.com` + `api.stablishdev.com`), and
+`@meta base` only ever covers one origin.
+
+Added `base:` as a key **on the node itself** — `buildRequest` now prefers
+`node.data.base` over `meta.base`, falling back exactly as before when a node
+doesn't set one. `{name}` interpolates in a node `base` too, same as `path`.
+No parser changes needed — `@node` bodies already parse any `key: value`
+generically, so this was a `run.ts`/`lint.ts`/`nodeTypes.ts` change, not a
+grammar one.
+
+`lint.ts`'s "relative path with no base" check now looks at both — a node
+with its own `base` and no `@meta base` at all is not flagged. `nodeTypes.ts`
+gained `base` in the `api` optional set so it's not flagged as an unknown key.
+
+Built `examples/multi-host.fml`: captures `username` from
+jsonplaceholder.typicode.com, spends it on httpbin.org via an `echoUser` node
+with its own `base:` — a value threaded across hosts, not just two literal
+URLs. Ran it live (not just parsed): PASS, `{username}` round-tripped through
+httpbin's echo. `--dry` prints the resolved `method url` per node either way,
+so which base a node actually used is visible on a failure too — that was the
+spec's actual ask, and it fell out of the existing plan-printer for free.
+
+5 tests added (`run.test.ts`: node base wins over `@meta base`, falls back when
+absent, interpolates; `lint.test.ts`: node base satisfies the no-base check),
+one existing assertion updated for the reworded message. `npm test` and
+`npm run build` clean. `HOW-TO.md` gained a
+"Multiple hosts in one file" section under `api` keys, since JB is handing
+that doc to another Claude session to author flows. On `feature/multi-host-base`,
+not merged — JB to review.
+
 
 ### 2026-09-05 — JB / Claude (cont.) — The run UI
 JB: *"run the ui… plan the ui properly with the ux in mind… is there a way to

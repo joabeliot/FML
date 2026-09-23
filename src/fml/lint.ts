@@ -131,13 +131,13 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
           : "an api node needs a path or a url before it can run",
         "path",
       );
-    } else if (!url && path && !isAbsolute(path) && base === "") {
+    } else if (!url && path && !isAbsolute(path) && base === "" && !data.base?.trim()) {
       // A warning, not an error: plenty of docs are only ever drawings, and
       // the runner reports this precisely at the moment it actually matters.
       add(
         node.id,
         "warning",
-        `"${path}" is relative but this doc has no "@meta base" — it can't run until one exists`,
+        `"${path}" is relative but neither this node nor the doc has a "base" — it can't run until one exists`,
         "path",
       );
     }
