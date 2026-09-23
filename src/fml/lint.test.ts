@@ -50,7 +50,7 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
   ok("request detail with no target is an error", meantIt.some((i) => i.severity === "error"));
 
   const noBase = lintOf(`@nodes\n  a = api\n@node a {\n  path: /x\n}\n`);
-  ok("relative path with no base is flagged", has(noBase, "a", "no \"@meta base\""));
+  ok("relative path with no base is flagged", has(noBase, "a", "neither this node nor the doc has a \"base\""));
   eq("as a warning — plenty of docs are only ever drawings", noBase[0]?.severity, "warning");
 
   const withBase = lintOf(`@meta\n  base: https://a.test\n@nodes\n  a = api\n@node a {\n  path: /x\n}\n`);
@@ -58,6 +58,11 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
 
   const absolutePath = lintOf(`@nodes\n  a = api\n@node a {\n  path: https://a.test/x\n}\n`);
   eq("an absolute path needs no base", absolutePath.length, 0);
+
+  // A node's own `base` satisfies this even with no `@meta base` at all —
+  // the multi-host case (auth.example.com vs. api.example.com in one file).
+  const nodeBase = lintOf(`@nodes\n  a = api\n@node a {\n  base: https://auth.test\n  path: /x\n}\n`);
+  eq("a node-level base is also fine, no @meta base needed", nodeBase.length, 0);
 }
 
 // 3. malformed execution values

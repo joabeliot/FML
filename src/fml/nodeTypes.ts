@@ -64,7 +64,10 @@ export const NODE_TYPES: readonly FmlTypeSpec[] = [
     expects: ["method", "path"],
     // Execution-ready: header.<Name>, query.<name> and capture.<var> are
     // prefixes rather than literal keys — see isExecKey below.
-    optional: ["url", "body", "auth", "expect", "note"],
+    // `base` overrides `@meta base` for this one node — a flow that spans
+    // services (auth on one host, billing on another) without splitting into
+    // multiple docs. See lore/ideas/flow-execution.md.
+    optional: ["url", "base", "body", "auth", "expect", "note"],
   },
   {
     type: "decision",

@@ -192,10 +192,12 @@ function appendQuery(url: string, query: Array<[string, string]>): string {
  * Assemble the HTTP request an `api` node describes, with every `{name}`
  * already substituted.
  *
- * `url` wins over `path`; `path` is joined onto the doc's `@meta base`.
- * `header.<Name>` and `query.<name>` are repeatable. `auth` is sugar over the
- * Authorization header: `none` sends nothing, `bearer <v>` sends
- * `Bearer <v>`, anything else is passed through literally.
+ * `url` wins over `path`; `path` is joined onto a base — the node's own
+ * `base` when it has one (a flow that spans services, e.g. auth on one host,
+ * billing on another), otherwise the doc's `@meta base`. `header.<Name>` and
+ * `query.<name>` are repeatable. `auth` is sugar over the Authorization
+ * header: `none` sends nothing, `bearer <v>` sends `Bearer <v>`, anything
+ * else is passed through literally.
  */
 export function buildRequest(
   node: FmlNode,
@@ -217,10 +219,14 @@ export function buildRequest(
   if (!explicit && !path) {
     return { missing, error: `${node.id}: needs a "url" or a "path" to send anything` };
   }
-  const base = sub((meta.base ?? "").trim());
+  const nodeBase = data.base?.trim();
+  const base = sub((nodeBase || meta.base || "").trim());
   let url = explicit ? sub(explicit) : joinUrl(base, sub(path ?? ""));
   if (!explicit && base === "" && !url.startsWith("http")) {
-    return { missing, error: `${node.id}: "path" is relative but the doc has no "@meta base"` };
+    return {
+      missing,
+      error: `${node.id}: "path" is relative but there's no "base" on the node or "@meta base" on the doc`,
+    };
   }
 
   const headers: Record<string, string> = {};
