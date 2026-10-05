@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { StepResult } from "../fml/index.ts";
 import type { FlowRun } from "../hooks/useFlowRun.ts";
 
@@ -48,6 +49,17 @@ interface Props {
  * straight to the node you care about.
  */
 export function RunBar({ run, open, onToggle, onSelectNode, selectedNodeId, onClose }: Props) {
+  const [copiedVar, setCopiedVar] = useState<string | null>(null);
+  const copyVar = async (name: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedVar(name);
+      setTimeout(() => setCopiedVar((c) => (c === name ? null : c)), 1200);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
   const requests = run.steps.filter((s) => !s.passthrough);
   const total = requests.reduce((ms, s) => ms + (s.durationMs ?? 0), 0);
   const failed = run.steps.find((s) => !s.ok);
@@ -194,11 +206,16 @@ export function RunBar({ run, open, onToggle, onSelectNode, selectedNodeId, onCl
               <p className="px-1 font-mono text-[10px] text-ink-mute/70">none yet</p>
             )}
             {captured.map(([name, value]) => (
-              <div key={name} className="flex gap-2 px-1 py-[2px] font-mono text-[10px]">
+              <div key={name} className="flex items-center gap-2 px-1 py-[2px] font-mono text-[10px]">
                 <span className="shrink-0 text-ink-dim">{name}</span>
-                <span className="min-w-0 flex-1 truncate text-ink-mute" title={value}>
-                  {value}
-                </span>
+                <button
+                  onClick={() => copyVar(name, value)}
+                  title={copiedVar === name ? "Copied" : `Click to copy: ${value}`}
+                  className="min-w-0 flex-1 truncate text-left transition-colors hover:text-ink"
+                  style={{ color: copiedVar === name ? PASS : "var(--color-ink-mute)" }}
+                >
+                  {copiedVar === name ? "copied" : value}
+                </button>
               </div>
             ))}
           </div>
