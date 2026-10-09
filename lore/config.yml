@@ -1,6 +1,6 @@
 project: protoarque
 session: f896f6b0-f87b-4eb8-b5de-ce58141e5d20
 description: Canvas-based tech tree and roadmap builder. Drop nodes, draw connections, track what's acquired.
-working_dir: /Users/joabeliot/projects/arque/Proto
-lore_dir: /Users/joabeliot/projects/arque/Proto/lore
-ticket: /Users/joabeliot/projects/arque/Proto/lore/workspace/ticket.json
+working_dir: /Users/joabeliot/projects/arque/fml
+lore_dir: /Users/joabeliot/projects/arque/fml/lore
+ticket: /Users/joabeliot/projects/arque/fml/lore/workspace/ticket.json

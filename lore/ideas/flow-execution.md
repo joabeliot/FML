@@ -79,9 +79,19 @@ An `event` node can seed the run's starting variables.
    there is a single flat variable store, so whether a capture crosses a portal
    is a *routing* decision (does the walk step into the portal's doc?), not a
    variables one. Whenever routing says yes, the values are already there.
-4. Browser runner: swap the transport for `fetch`-behind-a-proxy (or the
-   backend), then per-step pass/fail on the canvas. Blocked on: the CORS
-   decision, and the run-result UI.
+4. Browser runner — DONE (2026-09-05/08). Dev-proxy transport, per-step
+   pass/fail + camera-follow on the canvas (`src/hooks/useFlowRun.ts`,
+   `src/components/RunBar.tsx`).
+5. **Body assertions — ticket PAQ-11, not started.** `expect` only checks
+   status; a 200 with the wrong number in the body still scores green. Raised
+   2026-10-09 by a Claude session testing stablishMind's income calc end to
+   end: "without that, FML tests are smoke tests not correctness tests."
+   `assert.<name>: <expr>` on `api` nodes, same shape as `capture.<var>`. See
+   the ticket for the comparison grammar and the full ripple. Two things it
+   deliberately does NOT cover, both separate follow-ups: routing on a
+   captured/asserted value (today only status picks a branch — see the
+   `decision` line below), and test-data seeding (FML has no backend-state
+   concept by design; probably stays Django's job, not FML's).
 
 ### Resolved: `expect` vs. a drawn status edge
 

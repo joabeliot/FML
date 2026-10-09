@@ -245,7 +245,39 @@
           "detail": "PAQ-10"
         }
       ]
+    },
+    {
+      "id": "PAQ-11",
+      "name": "Body assertions: assert.<path> on api nodes",
+      "description": "Problem: expect only checks the response STATUS. A flow that gets 200 back\nwith the wrong number in the body still scores green — FML confirms the API\nresponded, not that it said the right thing. Raised by a Claude session\nworking on stablishMind, testing an income calc (link bank -> sync ->\nincome): \"the one thing to build first is body assertions ... without that,\nFML tests are smoke tests not correctness tests.\" Confirmed against the\ncodebase 2026-10-09 — real gap, right priority call.\n\nWhat to build: a new `assert.<name>: <expr>` dotted key on `api` nodes, same\nshape as `capture.<var>` (repeatable, suffix is just a label for error\nmessages — not a variable name, nothing stores it). Reuses readPath() from\nrun.ts to pull the value out of the response, the same path syntax\ncapture already uses ($.data.income_rate, status, header.<Name>).\n\nComparison grammar for <expr>:\n  - bare value           exact match after type coercion (assert.status: active)\n  - ~N                   numeric, within tolerance of N (need to pick: relative\n                          1% default, or require an explicit range like\n                          ~11900+-50 -- decide before implementing, affects\n                          the grammar)\n  - >= <= > < !=          numeric comparison\n  - anything else         treated as exact string match\n\nNeeds: readPath() currently can't resolve `.length` on an array (pathTokens\nwalks object keys / numeric indices only) -- `assert.sources.length: >= 2`\nfrom the motivating example needs this. Add array .length as a special-cased\nterminal token in readPath, not a general feature.\n\nFailure semantics: match `expect`'s philosophy exactly -- an assert failure\nmarks the step failed (red) but does NOT stop the walk by itself; it follows\nthe drawn edge same as a failed status expect does today (stopOnFailure still\nthe fail-fast override). Captures run first, then expect, then asserts --\norder matters because an assert can reference a value this same node just\ncaptured.\n\nRipple (per CLAUDE.md -- language changes touch all of these):\n  - src/fml/run.ts: buildRequest already reads node.data generically, this is\n    new logic in runNode -- parse the comparison grammar, evaluate, fold into\n    StepResult alongside captures/expect. readPath gets .length support.\n  - src/fml/nodeTypes.ts: add \"assert\" to EXEC_KEY_PREFIXES so it's not\n    flagged as an unknown key (same as header./query./capture.).\n  - src/fml/lint.ts: malformed assert expression (bad operator, empty path)\n    gets flagged the same way an empty capture.x: path is today.\n  - HOW-TO.md: new section under the `api` keys reference, same treatment as\n    the \"Multiple hosts in one file\" section.\n  - examples/: extend one example (or add a new one) that fails on purpose\n    via assert so the behavior is demonstrated, not just described.\n  - Tests: run.test.ts (grammar parsing, .length on an array, pass/fail/stop\n    semantics), lint.test.ts (malformed assert flagged).\n\nExplicitly NOT in scope for this ticket (separate follow-ups, see\nlore/ideas/flow-execution.md):\n  - Conditional ROUTING on a captured/asserted value (branching on\n    {income_rate} > 10000 instead of status) -- valuable but a different\n    problem; this ticket is about scoring a step, not choosing an edge.\n  - Test-data seeding / a `setup` node type -- FML has no backend-state\n    concept today by design; probably stays Django's job (dedicated test\n    fixtures/accounts) rather than something FML owns. Needs its own\n    decision, not bundled in here.\n\nOpen question before starting: the tolerance syntax for ~N (relative %\ndefault vs. requiring an explicit range) -- pick one before writing the\nparser, it's the one part of the grammar without an obvious right answer.",
+      "context": [
+        "lore/ideas/flow-execution.md",
+        "src/fml/run.ts",
+        "src/fml/lint.ts",
+        "src/fml/nodeTypes.ts"
+      ],
+      "plan": null,
+      "status": "todo",
+      "priority": "P1",
+      "tags": [
+        "execution",
+        "language",
+        "run.ts",
+        "lint.ts"
+      ],
+      "source": "Claude",
+      "created": "2026-10-09",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-09T10:57:33.172468+00:00",
+          "event": "created",
+          "detail": "PAQ-11"
+        }
+      ]
     }
   ],
-  "counter": 11
+  "counter": 12
 }
