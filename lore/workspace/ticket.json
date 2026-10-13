@@ -277,7 +277,239 @@
           "detail": "PAQ-11"
         }
       ]
+    },
+    {
+      "id": "FML-12",
+      "name": "Header assertion operators: matches (regex), exists, absent (extends FML-11)",
+      "description": "DEPENDS ON FML-11. readPath already resolves header.<Name> (src/fml/run.ts), so assert.header.<Name> comes free with FML-11's assert grammar. This ticket only adds the operators FML-11 lacks: regex match, exists, absent. Motivation: Flock weak-ETag bug (W/\"x\") needed a regex/prefix check. See ideas/flock-audit-lore-fml.md.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "assertions"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.889826+00:00",
+          "event": "created",
+          "detail": "FML-12"
+        }
+      ]
+    },
+    {
+      "id": "FML-13",
+      "name": "Byte/hash assertions: sha256 of response body, content-length, 206/416 range checks",
+      "description": "DEPENDS ON FML-11. Genuinely new: needs the runner to hold the raw response bytes (today only parsed text/JSON) so assert can compare sha256 and length, and a Range request header. Open design point: variable holding an expected hash. Decrypt-then-hash (Flock media) can be a separate follow-up; start with plain body sha256. Tests in run.test.ts.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "runner",
+        "assertions"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.896508+00:00",
+          "event": "created",
+          "detail": "FML-13"
+        }
+      ]
+    },
+    {
+      "id": "FML-14",
+      "name": "Conditional GET example + docs: capture header.ETag then If-None-Match expects 304",
+      "description": "DEPENDS ON FML-11. capture.<var>: header.<Name> already works; no new language feature needed. Deliver: examples/conditional-get.fml (capture ETag, replay with If-None-Match: {etag}, expect 304, also a weak W/ variant), a HOW-TO.md section, and a run.test.ts case. Flock bug: edge rewrote ETag to weak and the origin's exact match returned 200.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "variables"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.901447+00:00",
+          "event": "created",
+          "detail": "FML-14"
+        }
+      ]
+    },
+    {
+      "id": "FML-15",
+      "name": "Machine-readable run result (JSON): failing node, request, response, assertion",
+      "description": "Runner currently exits 0/1. Add --json (or file output) so a manager/agent can read exactly what failed and write a fix packet. Include timings and variable captures (secrets redacted).",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "runner",
+        "agents"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.906193+00:00",
+          "event": "created",
+          "detail": "FML-15"
+        }
+      ]
+    },
+    {
+      "id": "FML-16",
+      "name": "Make FML a gate: run flows against a deployed staging URL as the done-check",
+      "description": "Runner already takes FML_VAR_baseUrl. Document and test the staging path, then run flockApi tests/fml/prototype.fml against https://flock-staging.flockfoundation.workers.dev as a real gate (it never ran as one on Flock v2). Report what needs changing.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "runner",
+        "integration"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.910809+00:00",
+          "event": "created",
+          "detail": "FML-16"
+        }
+      ]
+    },
+    {
+      "id": "FML-17",
+      "name": "Secrets-from-env store for run-time tokens (appCheck, memberToken, ...)",
+      "description": "Tokens are passed by hand each run. Add a gitignored secrets file or env-prefix loader plus redaction in output.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "secrets"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.915373+00:00",
+          "event": "created",
+          "detail": "FML-17"
+        }
+      ]
+    },
+    {
+      "id": "FML-18",
+      "name": "OpenAPI drift report: compare .fml flows with the API spec",
+      "description": "Flock's catalog.fml described endpoints later built differently and nothing flagged it. Given an OpenAPI file, list flow requests that do not exist or whose status codes differ.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "openapi"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.919953+00:00",
+          "event": "created",
+          "detail": "FML-18"
+        }
+      ]
+    },
+    {
+      "id": "FML-19",
+      "name": "UI step type: drive browser/simulator inside a flow (API -> dashboard -> app)",
+      "description": "Most Flock UI bugs (drawer reset, blank busy button, preview ignoring tracks) were only found by driving the real UI. Add a step type backed by Playwright/Chrome (and later simulator) with screenshot capture. Design first; keep optional.",
+      "context": [
+        "ideas/flock-audit-lore-fml.md",
+        "ideas/agentic-dev.md",
+        "ideas/flow-execution.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "ui"
+      ],
+      "source": "Flock v2 audit 2026-10-13",
+      "created": "2026-10-13",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-13T08:47:55.924339+00:00",
+          "event": "created",
+          "detail": "FML-19"
+        }
+      ]
     }
   ],
-  "counter": 12
+  "counter": 20
 }
