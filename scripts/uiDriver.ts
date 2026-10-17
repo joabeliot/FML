@@ -20,7 +20,8 @@ export interface PlaywrightDriver extends UiDriver {
 
 const STEP_TIMEOUT_MS = 15_000;
 
-async function launch(headed: boolean): Promise<Browser> {
+/** Playwright's Chromium if installed, else the machine's Chrome. Shared with the e2e suite. */
+export async function launch(headed: boolean): Promise<Browser> {
   const forced = process.env.FML_UI_BROWSER;
   const attempts = forced === "chrome" ? [{ channel: "chrome" }] : forced === "chromium" ? [{}] : [{}, { channel: "chrome" }];
   let last: unknown;

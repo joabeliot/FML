@@ -51,10 +51,20 @@ into the source file.
 
 ## Working rules
 
-- **Run `npm test` and `npm run build` before saying anything works.** Eleven
-  suites: `src/fml/parse.test.ts`, `stats.test.ts`, `variables.test.ts`,
-  `run.test.ts`, `lint.test.ts`, `report.test.ts`, `drift.test.ts`, `src/rml/rml.test.ts`, `src/lib/fmlEdit.test.ts`,
-  `src/lib/fmlStructure.test.ts`, `src/lib/dataWires.test.ts`.
+- **Run `npm test` and `npm run build` before saying anything works.** For any
+  change that touches the dashboard (components, hooks, canvas, App), or a
+  release, run **`npm run test:all`**, which adds the end-to-end suite. Three
+  layers, all no-internet (see `lore/testing/registry.md`):
+  - `npm test`: 12 fast suites: the unit suites under `src/` (parser, stats,
+    variables, run, lint, report, drift, rml, fmlEdit, fmlStructure,
+    dataWires) plus `scripts/cli.test.ts`, which runs the real CLIs
+    (`run`, `drift`, `demo`) against a local fixture API.
+  - `npm run test:e2e`: `scripts/e2e.ts` starts its own Vite server and
+    fixture API, drives the real app in Chrome with Playwright, and checks
+    the **file text** after every edit. It fails on any console error or
+    React Flow warning. Add `--headed` to watch.
+  - A new feature adds its own checks to the matching layer, and a bug fix
+    adds the test that would have caught it.
 - **`npm run demo -- <file>` is the structural check** when you can't see the canvas.
 - **Language changes ripple.** A new node type or key touches the parser, the
   renderer, the property panel, `HOW-TO.md` and the examples. Do all of them.

@@ -63,7 +63,9 @@ Anything else draws but warns.
 ```bash
 npm install
 npm run dev        # vite dev server
-npm test           # parser, stats and write-back suites
+npm test           # unit suites + the CLIs against a local fixture API (no internet)
+npm run test:e2e   # the dashboard, end to end, in Chrome via Playwright (--headed to watch)
+npm run test:all   # test + build + e2e — before any release
 npm run demo -- examples/shop.fml   # structural read, no canvas needed
 npm run build      # tsc -b && vite build
 ```
