@@ -34,6 +34,12 @@ export interface HttpResponse {
   headers: Record<string, string>;
   /** Raw text. `capture` parses it as JSON on demand — a non-JSON body is fine. */
   body: string;
+  /**
+   * The body exactly as it came off the wire. Text decoding is lossy for
+   * binary media, so `body.sha256` / `body.bytes` read this when a transport
+   * supplies it, and fall back to the UTF-8 encoding of `body` when not.
+   */
+  bytes?: Uint8Array<ArrayBuffer>;
 }
 
 export type Transport = (req: HttpRequest, signal?: AbortSignal) => Promise<HttpResponse>;
@@ -92,6 +98,7 @@ function asText(value: unknown): string | undefined {
  *   `$`              the whole body, verbatim
  *   `status`         the status code
  *   `header.<Name>`  a response header, case-insensitive
+ *   `body.bytes`     the body's length in bytes (raw, not characters)
  *   `….length`       as the last segment on an array, its length — so
  *                    `assert.sources.length: >= 2` works. Only there: on an
  *                    object, `length` is still just a key.
@@ -104,6 +111,8 @@ export function readPath(res: HttpResponse, path: string): string | undefined {
   const expr = path.trim();
   if (expr === "status") return String(res.status);
   if (expr === "$" || expr === "") return res.body;
+
+  if (expr === "body.bytes") return String(rawBytes(res).length);
 
   const lower = expr.toLowerCase();
   if (lower.startsWith("header.")) {
@@ -135,6 +144,22 @@ export function readPath(res: HttpResponse, path: string): string | undefined {
     cursor = (cursor as Record<string, unknown>)[token];
   }
   return asText(cursor);
+}
+
+/** The body as bytes — the transport's own when it kept them. */
+function rawBytes(res: HttpResponse): Uint8Array<ArrayBuffer> {
+  return res.bytes ?? new TextEncoder().encode(res.body);
+}
+
+/**
+ * `readPath`, plus the one path that can't be synchronous: `body.sha256`, the
+ * lowercase hex SHA-256 of the raw body. Web Crypto is built into Node and
+ * every browser, so this stays dependency-free.
+ */
+export async function resolvePath(res: HttpResponse, path: string): Promise<string | undefined> {
+  if (path.trim() !== "body.sha256") return readPath(res, path);
+  const digest = await crypto.subtle.digest("SHA-256", rawBytes(res));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // -- status assertions ----------------------------------------------------
@@ -317,7 +342,11 @@ function assertKeys(node: FmlNode): Array<[string, string]> {
  * Score a response against the node's `assert.*` keys. Runs after captures,
  * so an operand can name a `{value}` this very node just pulled out.
  */
-function evaluateAsserts(node: FmlNode, response: HttpResponse, vars: Record<string, string>): AssertResult[] {
+async function evaluateAsserts(
+  node: FmlNode,
+  response: HttpResponse,
+  vars: Record<string, string>,
+): Promise<AssertResult[]> {
   const out: AssertResult[] = [];
   for (const [label, value] of assertKeys(node)) {
     const expr = value.trim();
@@ -327,7 +356,7 @@ function evaluateAsserts(node: FmlNode, response: HttpResponse, vars: Record<str
       continue;
     }
     const a = parsed.assertion;
-    const actual = readPath(response, a.path);
+    const actual = await resolvePath(response, a.path);
     const { text: operand, missing } = interpolate(a.operand, vars);
     const outcome =
       missing.length > 0
@@ -400,7 +429,7 @@ export async function runNode(
 
   const captures: CaptureResult[] = [];
   for (const [name, path] of captureKeys(node)) {
-    const value = readPath(response, path);
+    const value = await resolvePath(response, path);
     captures.push({ name, path, value, ok: value !== undefined });
     if (value !== undefined) vars[name] = value;
   }
@@ -408,7 +437,7 @@ export async function runNode(
   const expect = node.data.expect?.trim();
   const statusOk = !expect || statusMatches(expect, response.status);
   const failedCapture = captures.find((c) => !c.ok);
-  const asserts = evaluateAsserts(node, response, vars);
+  const asserts = await evaluateAsserts(node, response, vars);
   const failedAssert = asserts.find((a) => !a.ok);
 
   let error: string | undefined;

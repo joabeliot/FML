@@ -335,6 +335,41 @@ the path; `--fail-fast` stops at it instead. The step log prints every assert
 with ✔/✖ and what actually came back. See `examples/assertions.fml`, which
 fails on purpose.
 
+### Bytes — hashes, lengths, ranges
+
+For media, a 200 proves nothing; the bytes have to be the right bytes.
+`body.sha256` is the lowercase hex SHA-256 of the raw body and `body.bytes` is
+its length in bytes. Both read the bytes as they came off the wire, so binary
+bodies hash correctly. Keep the expected hash in a variable:
+
+```
+@vars
+  coverHash: 8d8bfac911cdfa1e804c07422282669d1dcf9888bc56b9b6cae11e54e960b04b
+
+@node cover {
+  method: GET
+  path: /media/cover.jpg
+  expect: 200
+  assert.body.sha256: {coverHash}
+  assert.body.bytes: == 48213
+}
+
+@node firstChunk {
+  method: GET
+  path: /media/cover.jpg
+  header.Range: bytes=0-1023
+  expect: 206
+  assert.body.bytes: == 1024
+  assert.header.Content-Range: matches ^bytes 0-1023/
+}
+```
+
+`header.Range` is an ordinary header, so `206` (partial) and `416` (range not
+satisfiable) are just `expect` values. `capture.hash: body.sha256` works too,
+to compare two downloads. `body.sha256` and `body.bytes` are reserved: for a
+JSON field at `body.bytes`, write `$.body.bytes`. Full flow:
+`examples/bytes.fml`.
+
 ### Conditional GET — ETag in, 304 out
 
 No special syntax: capture the `ETag` header, send it back as
@@ -410,6 +445,8 @@ cared about — two different reasons for that:
 | `status` | the status code |
 | `header.<Name>` | a response header, case-insensitive |
 | `$.items.length` | an array's length (only as the last segment) |
+| `body.sha256` | lowercase hex SHA-256 of the raw body bytes |
+| `body.bytes` | the body's length in bytes |
 
 A capture that finds nothing **fails the step** — a silently-empty `{token}`
 is the worst outcome a test run can have.

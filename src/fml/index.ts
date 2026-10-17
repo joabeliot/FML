@@ -33,6 +33,7 @@ export {
   isStatusLabel,
   readPath,
   requiredInputs,
+  resolvePath,
   runFlow,
   runNode,
   startNode,

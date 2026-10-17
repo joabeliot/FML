@@ -103,7 +103,8 @@ const send: Transport = async (req: HttpRequest, signal?: AbortSignal) => {
   r.headers.forEach((v, k) => {
     headers[k] = v;
   });
-  return { status: r.status, headers, body: await r.text() };
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  return { status: r.status, headers, body: new TextDecoder().decode(bytes), bytes };
 };
 
 /**

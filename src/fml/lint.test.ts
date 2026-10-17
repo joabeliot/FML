@@ -119,7 +119,7 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
 
 // 6. every shipped example lints clean
 {
-  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml"];
+  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml", "examples/bytes.fml"];
   for (const file of clean) {
     // Read through parse so @meta/@vars are real; no @fof in these.
     const src = await import("node:fs").then((fs) => fs.readFileSync(file, "utf8"));

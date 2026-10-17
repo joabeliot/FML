@@ -11,6 +11,7 @@ import {
   interpolate,
   readPath,
   requiredInputs,
+  resolvePath,
   runFlow,
   runNode,
   statusMatches,
@@ -48,7 +49,12 @@ function fakeTransport(
     sent.push(req);
     const canned = answers[Math.min(i, answers.length - 1)] ?? {};
     i++;
-    return { status: canned.status ?? 200, headers: canned.headers ?? {}, body: canned.body ?? "" };
+    return {
+      status: canned.status ?? 200,
+      headers: canned.headers ?? {},
+      body: canned.body ?? "",
+      ...(canned.bytes ? { bytes: canned.bytes } : {}),
+    };
   };
   return { transport, sent };
 }
@@ -416,6 +422,69 @@ function fakeTransport(
   const buggy = await runFlow(doc, { transport: origin(false).transport });
   ok("an exact-match origin fails the weak replay", !buggy.ok);
   eq("at replayWeak", buggy.steps.find((s) => !s.ok)?.nodeId, "replayWeak");
+}
+
+// 5f. bytes — sha256, byte length, Range ----------------------------------
+{
+  const ALPHA = "abcdefghij";
+  const text: HttpResponse = { status: 206, headers: {}, body: ALPHA };
+  eq(
+    "sha256 of a text body",
+    await resolvePath(text, "body.sha256"),
+    "72399361da6a7754fec986dca5b7cbaf1c810a28ded4abaf56b2106d06cb78b0",
+  );
+  eq("body.bytes counts bytes", readPath({ ...text, body: "é" }, "body.bytes"), "2");
+
+  // Binary that isn't valid UTF-8: hashing the decoded text would be wrong,
+  // so the transport's raw bytes win.
+  const raw = new Uint8Array([0xff, 0xfe, 0x00, 0x80]);
+  const binary: HttpResponse = { status: 200, headers: {}, body: new TextDecoder().decode(raw), bytes: raw };
+  eq(
+    "sha256 reads the raw bytes, not the decoded text",
+    await resolvePath(binary, "body.sha256"),
+    "5a741968f40e57485ed6e1a1af381adeb2714223c35acedf1ad0670e42df2eb5",
+  );
+  eq("body.bytes reads the raw bytes", readPath(binary, "body.bytes"), "4");
+  eq("other paths still sync through resolvePath", await resolvePath(text, "status"), "206");
+
+  const node = {
+    id: "chunk",
+    type: "api",
+    data: {
+      url: "https://a.test/media",
+      "header.Range": "bytes=0-9",
+      expect: "206",
+      "capture.hash": "body.sha256",
+      "assert.body.sha256": "{expectedHash}",
+      "assert.body.bytes": "== 10",
+      "assert.header.Content-Range": "matches ^bytes 0-9/",
+    },
+  };
+  const t = fakeTransport([{ status: 206, headers: { "content-range": "bytes 0-9/26" }, body: ALPHA }]);
+  const vars: Record<string, string> = {
+    expectedHash: "72399361da6a7754fec986dca5b7cbaf1c810a28ded4abaf56b2106d06cb78b0",
+  };
+  const step = await runNode(node, {}, vars, t.transport);
+  ok("a ranged chunk passes hash, length and Content-Range", step.ok, step.error);
+  eq("the Range header went out", t.sent[0]?.headers.Range, "bytes=0-9");
+  eq("a hash can be captured too", vars.hash, vars.expectedHash);
+
+  const tampered = await runNode(
+    node,
+    {},
+    { ...vars },
+    fakeTransport([{ status: 206, headers: { "content-range": "bytes 0-9/26" }, body: "abcdefghiX" }]).transport,
+  );
+  ok("one changed byte fails the hash", !tampered.ok);
+  ok("and names it", tampered.error?.includes("body.sha256") === true, tampered.error);
+
+  const outOfRange = await runNode(
+    { id: "past", type: "api", data: { url: "https://a.test/media", "header.Range": "bytes=100-200", expect: "416" } },
+    {},
+    {},
+    fakeTransport([{ status: 416 }]).transport,
+  );
+  ok("416 for a range past the end", outOfRange.ok, outOfRange.error);
 }
 
 // 6. chooseEdge ------------------------------------------------------------
