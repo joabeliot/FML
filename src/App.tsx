@@ -723,6 +723,12 @@ export function App() {
                 addFiles({ "roadmap.rml": ROADMAP_EXAMPLE });
                 setRoadmapPick("roadmap.rml");
               }}
+              onNew={() => {
+                let key = "roadmap.rml";
+                for (let n = 2; ws.files[key] !== undefined; n++) key = `roadmap${n}.rml`;
+                addFiles({ [key]: "# A roadmap: A -> B means B depends on A.\n@nodes\n  start = milestone\n" });
+                setRoadmapPick(key);
+              }}
               onRemove={removeFile}
               rightInset={sourceOpen ? SOURCE_W : 0}
             />

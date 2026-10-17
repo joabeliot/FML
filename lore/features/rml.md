@@ -57,11 +57,30 @@ depends-on and unlocks).
 | Flows/Roadmap switch, file routing, toolbar mode | `src/App.tsx`, `src/components/Toolbar.tsx` |
 | Example (F*ML's own roadmap, real statuses as of 2026-10-17) | `examples/roadmap.rml` |
 
+## FML-28: skill-tree look + editing (2026-10-17)
+
+Joab sent a game talent-tree screenshot as the target look.
+
+- **Layout** (`src/lib/radialLayout.ts`, pure + tested): roots at the
+  centre; each node one grid step (124px) from its tree parent (its deepest
+  prerequisite) in one of 8 compass directions, taking the free cell closest
+  to its branch's outward heading, further out if the near ones are taken.
+  Placed breadth-first; siblings grouped by area. Gives the octilinear look
+  of the reference. A first pass used a polar tidy-tree, which put lines at
+  every angle and looked tangled, so it was dropped.
+- **Tiles**: square features (74px if they unlock ≥3, else 56), diamond
+  milestones, an icon per tile (`icon:` key, else picked from the id), the
+  label underneath on a backing so lines never run through text. Warm dark
+  canvas. Straight centre-to-centre lines (hidden centre handles).
+- **Editing**: + Feature / + Milestone (unlocked by the selection, if any),
+  drag a tile's gold `link` handle onto another to add a dependency (loops
+  refused), panel edits every field plus rename/kind/dependencies, Delete
+  key. All through `onEdit`, so App's undo stack covers it. Uses the same
+  `fmlStructure` / `fmlEdit` ops as the flow view; the grammar is the same.
+- **New roadmap** button creates `roadmap.rml` with one `start` milestone.
+
 ## Not done
 
 - Only a roadmap's first `@doc` is shown.
 - Tiles can't be dragged and positions aren't saved. The layout is always
-  automatic.
-- No structural editing (add/delete/connect) in the roadmap view yet. The
-  `fmlStructure.ts` ops would work as-is (the grammar is the same), but the
-  UI isn't wired.
+  automatic (by design for now: the grid is what keeps it tidy).

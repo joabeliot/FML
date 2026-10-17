@@ -25,6 +25,7 @@ and after any change to `src/components`, `src/hooks` or `src/App.tsx`.
 | Lint | `src/fml/lint.test.ts` | typo'd keys, base checks, malformed asserts, ui-node checks, listed examples lint clean |
 | Run report | `src/fml/report.test.ts` | shape, failure classification, value redaction, truncation, `.fml.env` parsing |
 | Spec drift | `src/fml/drift.test.ts` | path/method matching, base prefixes incl. `{var}` bases, status coverage, multi-host skip, multi-doc, junk spec |
+| Roadmap layout | `src/lib/radialLayout.test.ts` | centre root, one grid step per edge (octilinear), outward growth, deepest-prerequisite parent, no shared cells (incl. the example), cycles, area grouping |
 | RML | `src/rml/rml.test.ts` | RML vocabulary on FML's parser, status/ready/locked, checks incl. cycles, `examples/roadmap.rml` |
 | Write-back | `src/lib/fmlEdit.test.ts` | targeted surgery keeps comments/formatting, incl. flow lines with a trailing `# comment`; `@vars` add/change/remove/rename |
 | Structural edits | `src/lib/fmlStructure.test.ts` | add/delete/rename node, add/delete edge, doc-local, no-ops; deletes and renames every node in every example |
@@ -43,7 +44,7 @@ error, React Flow warning or failed request (except the favicon).
 | Structural editing (FML-22) | + Node declares and selects; rename rewrites; taken id refused; **drag handle → card** makes an edge; dropping exactly on a handle makes one, not two; label; Delete; Ctrl+Z; panel Delete cascades without touching the rest |
 | Variables (FML-27) | ports show with nothing selected; @vars + run-time inputs are nodes; + Node → Variable; rename + value via panel; drop on an input port repoints the reference; delete |
 | Data wires (FML-20) | none when off; selection shows a node's wires; Data shows all; drag port → card → picker writes `auth: bearer {token}`; new wire drawn |
-| Roadmap (FML-21) | example loads (20 tiles, 3 NEXT); status change written to the `.rml`; switching views is clean |
+| Roadmap (FML-21, FML-28) | example loads (20 tiles, 3 NEXT); status change; + Feature unlocked by the selection; rename; description; kind switch; drag link handle adds a dependency; loop refused; Delete; Ctrl+Z; view switching clean; New roadmap grows from `start` |
 | In-app run | two api steps pass through the dev proxy against the fixture API; ui step shows skipped `–` |
 | ui steps from the CLI (FML-19) | real Chrome against a fixture form: `fill.<field>` and `sel()`, captures, screenshot saved; wrong assert → JSON `kind: assert`; missing element names the action |
 
@@ -51,6 +52,7 @@ error, React Flow warning or failed request (except the favicon).
 
 - `drift` treated a variable base (`base: {apiBase}`) as a path segment. Found by the CLI suite.
 - Data wires (FML-20) rebuilt every canvas node on each selection change, which swallowed the double-click that opens a portal. Found by e2e and bisected to FML-20.
+- A wire dropped on an input port sometimes opened the field picker instead: React Flow snapped to the control-flow handle beside the port. Found by e2e as a 1-in-3 flake.
 - Connecting by dropping on a card (not exactly on its handle) did nothing; React Flow only connects within ~20px of a handle. Found by e2e as a zoom-dependent flake.
 
 ## Not covered

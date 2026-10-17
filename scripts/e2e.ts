@@ -388,17 +388,59 @@ try {
     ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 
-  await scenario("roadmap view (FML-21)", async () => {
+  await scenario("roadmap view and editing (FML-21, FML-28)", async () => {
     const { page, problems } = await open({ t: EDIT_FLOW });
     await page.getByRole("button", { name: /^roadmap/i }).click();
     await button(page, "Load the example roadmap").click();
     await page.locator(node("parser")).waitFor();
     ok("the example roadmap draws", (await page.locator(".react-flow__node").count()) === 20);
     ok("the frontier is tagged NEXT", (await page.getByText("next", { exact: true }).count()) === 3);
+    const rml = () => fileText(page, "roadmap.rml");
+
     await page.locator(node("stagingGate")).click();
-    await page.locator("select").last().selectOption("active");
+    await page.getByLabel("status").selectOption("active");
     await settle(page);
-    ok("changing a status writes it into the .rml", /@node stagingGate \{[^}]*status: active/.test(await fileText(page, "roadmap.rml")));
+    ok("changing a status writes it into the .rml", /@node stagingGate \{[^}]*status: active/.test(await rml()));
+
+    // + Feature with a tile selected adds what that tile unlocks.
+    await page.locator(node("rml")).click();
+    await button(page, "+ Feature").click();
+    await page.locator(node("feature1")).waitFor();
+    ok("+ Feature declares a feature", (await rml()).includes("feature1 = feature"));
+    ok("unlocked by the selected tile", (await rml()).includes("rml -> feature1"));
+
+    const idField = page.locator("label").filter({ hasText: /^id/ }).locator("input");
+    await idField.fill("exports");
+    await idField.press("Enter");
+    await page.locator(node("exports")).waitFor();
+    ok("renaming in the panel renames it everywhere", (await rml()).includes("rml -> exports") && !(await rml()).includes("feature1"));
+    const desc = page.locator("label").filter({ hasText: /^description/ }).locator("textarea");
+    await desc.fill("Export a roadmap as an image");
+    await desc.blur();
+    await settle(page);
+    ok("fields write into its @node block", /@node exports \{[^}]*description: Export a roadmap as an image/.test(await rml()), await rml());
+    await page.locator("label").filter({ hasText: /^kind/ }).locator("select").selectOption("milestone");
+    await settle(page);
+    ok("kind switches feature ↔ milestone", (await rml()).includes("exports = milestone"));
+
+    // Drag a tile's gold handle onto another: that one now depends on it.
+    await page.locator(node("drift")).hover();
+    await drag(page, `${node("drift")} .react-flow__handle[data-handleid="link"]`, node("exports"));
+    await settle(page);
+    ok("dragging the link handle onto a tile adds a dependency", (await rml()).includes("drift -> exports"), await rml());
+    await page.locator(node("exports")).hover();
+    await drag(page, `${node("exports")} .react-flow__handle[data-handleid="link"]`, node("drift"));
+    await settle(page);
+    ok("a link that would make a loop is refused", !(await rml()).includes("exports -> drift"));
+
+    await page.locator(node("exports")).click();
+    await page.keyboard.press("Delete");
+    await settle(page);
+    ok("Delete removes the tile and its links", !(await rml()).includes("exports"));
+    await page.keyboard.press("Control+z");
+    await settle(page);
+    ok("⌘Z / Ctrl+Z brings it back", (await rml()).includes("exports = milestone"));
+
     for (let i = 0; i < 2; i++) {
       await page.getByRole("button", { name: /^flows$/i }).click();
       await page.locator(node("Login")).waitFor();
@@ -406,6 +448,18 @@ try {
       await page.locator(node("parser")).waitFor();
     }
     ok("switching views back and forth is clean (no stray node types)", problems.length === 0, problems.join(" | "));
+  });
+
+  await scenario("a new roadmap from scratch", async () => {
+    const { page, problems } = await open({ t: EDIT_FLOW });
+    await page.getByRole("button", { name: /^roadmap/i }).click();
+    await button(page, "New roadmap").click();
+    await page.locator(node("start")).waitFor();
+    await page.locator(node("start")).click();
+    await button(page, "+ Feature").click();
+    await page.locator(node("feature1")).waitFor();
+    ok("a new roadmap starts with one milestone and grows from it", (await fileText(page, "roadmap.rml")).includes("start -> feature1"));
+    ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 
   await scenario("in-app run against a local API, ui steps skipped", async () => {

@@ -55,9 +55,9 @@ into the source file.
   change that touches the dashboard (components, hooks, canvas, App), or a
   release, run **`npm run test:all`**, which adds the end-to-end suite. Three
   layers, all no-internet (see `lore/testing/registry.md`):
-  - `npm test`: 12 fast suites: the unit suites under `src/` (parser, stats,
+  - `npm test`: 13 fast suites: the unit suites under `src/` (parser, stats,
     variables, run, lint, report, drift, rml, fmlEdit, fmlStructure,
-    dataWires) plus `scripts/cli.test.ts`, which runs the real CLIs
+    dataWires, radialLayout) plus `scripts/cli.test.ts`, which runs the real CLIs
     (`run`, `drift`, `demo`) against a local fixture API.
   - `npm run test:e2e`: `scripts/e2e.ts` starts its own Vite server and
     fixture API, drives the real app in Chrome with Playwright, and checks

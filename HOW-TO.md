@@ -899,17 +899,37 @@ FML, with different node types and a different meaning for arrows:
 | `fml` | the `.fml` that proves it; opens in the flow view if it's loaded |
 | `ticket` | lore ticket ids, comma-separated, shown as references |
 
-Switch to **Roadmap** at the top of the canvas, then open a `.rml` file (or
-load the example, `examples/roadmap.rml`, which is F*ML's own roadmap).
+| `icon` | the tile's icon: `flag`, `star`, `bolt`, `gear`, `shield`, `key`, `link`, `eye`, `chart`, `map`, `book`, `bug`, `rocket`, `cube`, `code`, `play`, `check`, `layers`, `hammer`, `flask` (or an emoji); left out, one is picked for you |
+
+Switch to **Roadmap** at the top of the canvas, then open a `.rml` file,
+start a **New roadmap**, or load the example (`examples/roadmap.rml`, which
+is F*ML's own roadmap).
+
+It's drawn as a game skill tree. Roots sit at the centre and each branch
+grows outward, one grid step at a time, so lines run straight or at 45°.
+Square tiles are features (bigger when they unlock three or more things);
+diamonds are milestones. Each `area` gets its own colour.
 
 - **Done** tiles are lit in their area's colour, and **active** ones are lit
-  with a gold ring.
+  with a glowing gold edge.
 - A pending tile whose dependencies are all done is **ready**: dark, with a
-  coloured outline and a `NEXT` tag. That's your frontier.
-- Everything else is **locked**.
-- Connectors turn gold once their prerequisite is done.
-- Click a tile to change its status (written straight into the file, ⌘Z to
-  undo) and to follow its flows, tickets, and what it depends on and unlocks.
+  coloured edge and a `NEXT` tag. That's your frontier.
+- Everything else is **locked** and dim.
+- Lines turn gold once their prerequisite is done.
+
+**Editing** (everything is written straight into the `.rml`; ⌘Z undoes):
+
+- **+ Feature / + Milestone** in the bottom bar adds a tile. With a tile
+  selected, the new one is what that tile unlocks.
+- **Connect** by hovering a tile and dragging its gold handle onto another:
+  the tile you drop on now depends on the one you dragged from. A link that
+  would make a loop is refused.
+- **Click a tile** to edit it in the panel: id (renamed everywhere), kind
+  (feature ↔ milestone), status, title, description, area, icon, the flows
+  that prove it, tickets, and its dependencies (**+ add** one, **×** to drop
+  one).
+- **Delete** with the panel's button or ⌫ / Delete removes the tile and its
+  links.
 
 The footer flags a status outside the three, a key RML doesn't know, and
 dependency cycles.
