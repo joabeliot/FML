@@ -20,8 +20,8 @@ and after any change to `src/components`, `src/hooks` or `src/App.tsx`.
 |------|-----------|-------|
 | Parser | `src/fml/parse.test.ts` | sections, `@doc`/`@fof`, edge notes, strict mode |
 | Stats | `src/fml/stats.test.ts` | flows, entry points, terminals |
-| Variables | `src/fml/variables.test.ts` | `{name}` resolution, `@vars`, captures |
-| Engine | `src/fml/run.test.ts` | interpolation, `readPath` (`.length`, `body.sha256`/`bytes`), statuses, requests, captures, `assert.*` grammar incl. page reads, header/ETag asserts, conditional GET vs fake origins, Range, **ui steps with a fake `UiDriver`** (action order, `fill.<field>`/`sel()`, captures, asserts, screenshot, skip without driver, walk rules, `examples/ui.fml` end to end), routing, guards |
+| Variables | `src/fml/variables.test.ts` | `{name}` resolution, `@vars`, captures, `ask.<name>` |
+| Engine | `src/fml/run.test.ts` | interpolation, `readPath` (`.length`, `body.sha256`/`bytes`), statuses, requests, captures, `assert.*` grammar incl. page reads, header/ETag asserts, conditional GET vs fake origins, Range, **ui steps with a fake `UiDriver`** (action order, `fill.<field>`/`sel()`, captures, asserts, screenshot, skip without driver, walk rules, `examples/ui.fml` end to end), routing, guards, **asking a person (FML-26)**: pause then asks in order, secret detection, supplied-up-front skip, cancel, no handler, throwing handler, prompt interpolation |
 | Lint | `src/fml/lint.test.ts` | typo'd keys, base checks, malformed asserts, ui-node checks, listed examples lint clean |
 | Run report | `src/fml/report.test.ts` | shape, failure classification, value redaction, truncation, `.fml.env` parsing |
 | Spec drift | `src/fml/drift.test.ts` | path/method matching, base prefixes incl. `{var}` bases, status coverage, multi-host skip, multi-doc, junk spec |
@@ -30,7 +30,7 @@ and after any change to `src/components`, `src/hooks` or `src/App.tsx`.
 | Write-back | `src/lib/fmlEdit.test.ts` | targeted surgery keeps comments/formatting, incl. flow lines with a trailing `# comment`; `@vars` add/change/remove/rename |
 | Structural edits | `src/lib/fmlStructure.test.ts` | add/delete/rename node, add/delete edge, doc-local, no-ops; deletes and renames every node in every example |
 | Data wires | `src/lib/dataWires.test.ts` | ports, one port per name, wires, sources, variable nodes + their wires, ports always visible, drop options |
-| **CLIs** | `scripts/cli.test.ts` | `run.ts` as a process: pass/fail exit codes, missing inputs, `--var`/`FML_VAR_`/`FML_SECRET_`, `.fml.env` + `--secrets` (incl. errors), redaction in log/plan/report, `--dry` sends nothing, `--json` failure kinds, `--fail-fast`, `--report`; `drift.ts` JSON/YAML/exit codes/coverage/usage; `demo.ts` lint and parse errors |
+| **CLIs** | `scripts/cli.test.ts` | `run.ts` as a process: pass/fail exit codes, missing inputs, `--var`/`FML_VAR_`/`FML_SECRET_`, `.fml.env` + `--secrets` (incl. errors), redaction in log/plan/report, `--dry` sends nothing, `--json` failure kinds, `--fail-fast`, `--report`, **ask/pause** (piped answers via `FML_ASK=stdin`, prompts on stderr, answer redacted, `q` cancels, non-interactive fails, `--yes`, `--json` records `asked`); `drift.ts` JSON/YAML/exit codes/coverage/usage; `demo.ts` lint and parse errors |
 
 ## End to end: `npm run test:e2e` (`scripts/e2e.ts`)
 
@@ -45,6 +45,7 @@ error, React Flow warning or failed request (except the favicon).
 | Variables (FML-27) | ports show with nothing selected; @vars + run-time inputs are nodes; + Node → Variable; rename + value via panel; drop on an input port repoints the reference; delete |
 | Data wires (FML-20) | none when off; selection shows a node's wires; Data shows all; drag port → card → picker writes `auth: bearer {token}`; new wire drawn |
 | Roadmap (FML-21, FML-28) | example loads (20 tiles, 3 NEXT); status change; + Feature unlocked by the selection; rename; description; kind switch; drag link handle adds a dependency; loop refused; Delete; Ctrl+Z; view switching clean; New roadmap grows from `start` |
+| Asking a person (FML-26) | asked value isn't requested up front; dialog mid-run, WAITING FOR YOU; masked secret; pause at the next node; Continue → PASS; Stop run → FAIL "you stopped it at me" |
 | In-app run | two api steps pass through the dev proxy against the fixture API; ui step shows skipped `–` |
 | ui steps from the CLI (FML-19) | real Chrome against a fixture form: `fill.<field>` and `sel()`, captures, screenshot saved; wrong assert → JSON `kind: assert`; missing element names the action |
 

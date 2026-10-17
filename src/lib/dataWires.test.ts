@@ -117,5 +117,15 @@ const g = dataGraph(doc);
   eq("non-api nodes only get their own fields", wireOptions({ note: "hi" }, "page", "token").map((o) => o.key), ["note"]);
 }
 
+// ask.<name> (FML-26): the asking node has an output port, wired to its spenders
+{
+  const { doc } = parse(`@nodes\n  A = page\n  B = page\n@node A {\n  ask.otp: Code?\n}\n@node B {\n  note: {otp}\n}\n`, { strict: false });
+  const g = dataGraph(doc);
+  eq("an ask is an output port", g.ports.get("A")?.outputs, ["otp"]);
+  eq("its spender's input says asked, and by whom", g.ports.get("B")?.inputs, [{ name: "otp", source: "ask", from: "A" }]);
+  eq("a wire runs from the asker, not a variable node", g.wires.map((w) => `${w.source}->${w.target}`), ["A->B"]);
+  eq("…and no variable node is made for it", g.vars, []);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

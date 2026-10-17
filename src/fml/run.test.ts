@@ -6,6 +6,7 @@
 import { evaluateAssertion, parseAssertion, type Assertion } from "./assert.ts";
 import { parse } from "./index.ts";
 import {
+  askRequests,
   buildRequest,
   chooseEdge,
   interpolate,
@@ -16,6 +17,8 @@ import {
   runNode,
   statusMatches,
   uiActions,
+  type AskHandler,
+  type AskRequest,
   type HttpRequest,
   type HttpResponse,
   type Transport,
@@ -716,6 +719,77 @@ function fakeTransport(
   ok("step failed", !run.ok);
   eq("nothing was sent", sent.length, 0);
   ok("error names the variable", run.steps[0]?.error?.includes("{token}") === true, run.steps[0]?.error);
+}
+
+// 10. asking a person mid-run (FML-26) ---------------------------------------
+{
+  const doc = parse(
+    `@meta\n  base: https://api.test\n@nodes\n  login = api\n  verify = api\n  Home = page\n` +
+      `@node login {\n  method: POST\n  path: /login\n}\n` +
+      `@node verify {\n  method: POST\n  path: /verify\n  body: {"code":"{otp}","note":"{why}"}\n  pause: Check your phone\n  ask.otp: The code we texted you\n  ask.why: Reason\n}\n` +
+      `@flow\n  login -> verify\n  verify -> Home\n`,
+    { strict: false },
+  ).doc;
+
+  const reqs = askRequests(doc.nodes.find((n) => n.id === "verify")!);
+  eq("pause first, then each ask in order", reqs.map((r) => r.name ?? r.kind), ["confirm", "otp", "why"]);
+  ok("an otp is treated as secret", reqs[1]?.secret === true);
+  ok("…a reason isn't", reqs[2]?.secret === false);
+  eq("asked names aren't needed up front", requiredInputs(doc), []);
+
+  const seen: AskRequest[] = [];
+  const answers: Record<string, string> = { otp: "424242", why: "test" };
+  const ask: AskHandler = async (req) => {
+    seen.push(req);
+    return req.kind === "confirm" ? "" : answers[req.name!]!;
+  };
+  const { transport, sent } = fakeTransport([{}, {}]);
+  const run = await runFlow(doc, { transport, ask });
+  ok("answered: the run passes", run.ok, JSON.stringify(run.steps.map((s) => s.error)));
+  eq("the answer lands in the request", sent[1]?.body, '{"code":"424242","note":"test"}');
+  eq("the step records what was asked", run.steps[1]?.asked?.map((a) => a.name ?? a.kind), ["confirm", "otp", "why"]);
+  ok("…but never the answer", !JSON.stringify(run.steps[1]?.asked).includes("424242"));
+  eq("nodes without questions ask nothing", seen.filter((r) => r.nodeId === "login").length, 0);
+
+  // Supplied up front: not asked (but a pause still waits).
+  seen.length = 0;
+  await runFlow(doc, { transport: fakeTransport([{}, {}]).transport, ask, vars: { otp: "1", why: "x" } });
+  eq("a value supplied up front isn't asked", seen.map((r) => r.name ?? r.kind), ["confirm"]);
+
+  // The person says stop.
+  const stop = fakeTransport([{}, {}]);
+  const cancelled = await runFlow(doc, { transport: stop.transport, ask: async () => null });
+  eq("null from the handler cancels", cancelled.stoppedBecause, "cancelled");
+  ok("…a cancelled run isn't ok", !cancelled.ok);
+  eq("…and says where", cancelled.cancelledAt, "verify");
+  eq("…before verify was sent", stop.sent.length, 1);
+
+  // Nobody to ask.
+  const alone = fakeTransport([{}, {}]);
+  const noAsk = await runFlow(doc, { transport: alone.transport });
+  eq("without a handler the step fails on ask", noAsk.steps[1]?.failedOn, "ask");
+  ok("…naming what it needed", noAsk.steps[1]?.error?.includes("--yes") === true, noAsk.steps[1]?.error);
+  eq("…and the walk ends there", noAsk.steps.length, 2);
+  eq("…with nothing sent for it", alone.sent.length, 1);
+
+  // A handler that throws fails the step with its message.
+  const threw = await runFlow(doc, {
+    transport: fakeTransport([{}, {}]).transport,
+    ask: async () => {
+      throw new Error("input ended");
+    },
+  });
+  ok("a throwing handler fails the step", threw.steps[1]?.failedOn === "ask" && threw.steps[1]?.error?.includes("input ended") === true);
+
+  // Bare `pause` on a page node, no message.
+  // The prompt quotes what the run already knows.
+  const quoting = parse(`@nodes\n  A = page\n@node A {\n  pause: Go on as {user}?\n}\n`, { strict: false }).doc;
+  const prompts: string[] = [];
+  await runFlow(quoting, { transport: fakeTransport([{}]).transport, vars: { user: "ada" }, ask: async (r) => (prompts.push(r.prompt), "") });
+  eq("a prompt is interpolated with the run's vars", prompts, ["Go on as ada?"]);
+
+  const bare = parse(`@nodes\n  A = page\n@node A {\n  pause:\n}\n`, { strict: false }).doc;
+  eq("an empty pause still pauses", askRequests(bare.nodes[0]!).map((r) => r.prompt), ["Continue past A?"]);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

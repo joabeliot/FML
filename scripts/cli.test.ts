@@ -31,7 +31,7 @@ interface Ran {
 }
 
 /** Run a script as a separate process. Async, so the fixture server keeps serving. */
-function cli(script: string, args: string[], env: Record<string, string> = {}): Promise<Ran> {
+function cli(script: string, args: string[], env: Record<string, string> = {}, input?: string): Promise<Ran> {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [script, ...args], {
       cwd: process.cwd(),
@@ -42,6 +42,7 @@ function cli(script: string, args: string[], env: Record<string, string> = {}): 
     child.stdout.on("data", (c) => (out += c));
     child.stderr.on("data", (c) => (err += c));
     child.on("close", (code) => resolve({ code: code ?? -1, out, err }));
+    if (input !== undefined) child.stdin.end(input);
   });
 }
 
@@ -189,7 +190,40 @@ try {
     ok("drift with no spec prints usage and exits 2", usage.code === 2 && usage.err.includes("usage"));
   }
 
-  // 7. demo (the structural check) -------------------------------------------------
+  // 7. asking a person mid-run (FML-26) ------------------------------------------------
+  {
+    const asking = join(dir, "asking.fml");
+    writeFileSync(
+      asking,
+      readFileSync(FLOW, "utf8").replace("  path: /login\n", "  path: /login\n  ask.password: Your password\n  pause: About to sign in\n"),
+    );
+    const ask = (args: string[], env: Record<string, string> = {}, input?: string) =>
+      cli("scripts/run.ts", [asking, ...args], { ...base, ...env }, input);
+
+    const piped = await ask([], { FML_ASK: "stdin" }, `\n${PASSWORD}\n`);
+    ok("an asked value typed in carries the run", piped.code === 0, piped.out + piped.err);
+    ok("…the prompt goes to stderr", piped.err.includes("Your password") && !piped.out.includes("Your password"), piped.err);
+    ok("…the step log says it was asked", piped.out.includes("{password} given after"), piped.out);
+    ok("…and the answer is redacted", !piped.out.includes(PASSWORD) && !piped.err.includes(PASSWORD));
+
+    const stop = await ask([], { FML_ASK: "stdin" }, "q\n");
+    ok("q at a pause stops the run", stop.code === 1 && stop.out.includes("stopped: cancelled"), stop.out + stop.err);
+    ok("…before anything was sent", stop.out.includes(`Stopped at "login"`), stop.out);
+
+    const ci = await ask([]);
+    ok("non-interactive, a pause fails the step", ci.code === 1 && ci.out.includes("--yes"), ci.out);
+    const yes = await ask(["--yes"]);
+    ok("--yes gets past the pause, but the value is still missing", yes.code === 1 && yes.out.includes("--var password="), yes.out);
+    const upFront = await ask(["--yes", "--var", `password=${PASSWORD}`]);
+    ok("--yes with the value up front runs without asking", upFront.code === 0 && !upFront.err.includes("Your password"), upFront.out + upFront.err);
+
+    const json = await ask(["--json"], { FML_ASK: "stdin" }, `\n${PASSWORD}\n`);
+    const report = JSON.parse(json.out) as { ok: boolean; steps: Array<{ asked?: Array<{ kind: string; name?: string }> }> };
+    ok("--json stays parseable while asking", report.ok);
+    ok("…and records what was asked, not the answer", JSON.stringify(report.steps[0]?.asked?.map((a) => a.name ?? a.kind)) === '["confirm","password"]' && !json.out.includes(PASSWORD), json.out);
+  }
+
+  // 8. demo (the structural check) -------------------------------------------------
   {
     const bad = join(dir, "bad.fml");
     writeFileSync(bad, "@nodes\n  a = api\n@node a {\n  path: /x\n  heder.Accept: y\n}\n");

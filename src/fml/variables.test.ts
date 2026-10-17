@@ -116,5 +116,11 @@ const SRC = `
   eq("vars takes priority", resolved.get("token"), { name: "token", source: "vars", value: "fallback-value" });
 }
 
+// ask.<name> (FML-26) supplies a variable — a person types it mid-run
+{
+  const { doc } = parse(`@nodes\n  A = page\n  B = page\n@node A {\n  ask.otp: Code?\n}\n@node B {\n  note: {otp}\n}\n`, { strict: false });
+  eq("an asked name resolves to its asker", resolveVariables(doc).get("otp"), { name: "otp", source: "ask", capturedBy: "A" });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

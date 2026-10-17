@@ -653,6 +653,45 @@ screenshot path.
 ` #submit` in a selector. (`button#submit`, with no space before `#`, is
 fine.)
 
+### Stopping for a person — `ask.<name>` and `pause`
+
+Some flows can't run end to end without someone: a code texted to a phone, an
+email link to click, a captcha. Any node can stop the run before it acts:
+
+```fml
+@node verify {
+  method: POST
+  path: /verify
+  pause: Check your phone for the code
+  ask.otp: The 6-digit code we texted you
+  body: {"code":"{otp}"}
+}
+```
+
+- `ask.<name>: <prompt>` asks a person for `{name}`. The answer is there for
+  this node and every one after, like a capture. It's never written to the
+  file, and an asked name doesn't count as a missing input before the run.
+- `pause: <message>` waits until the person says go on. An empty `pause:`
+  works too.
+- The pause comes first, then the asks in the order written. A prompt can
+  quote what the run knows so far: `pause: Look up {username}'s posts?`.
+- **Supplied up front, not asked.** If `{otp}` already has a value from
+  `--var`, `.fml.env` or the run dialog, the node doesn't ask. That's how
+  CI runs the same flow.
+- **In the app** a dialog appears mid-run (the bar says WAITING FOR YOU).
+  Continue carries on and **Stop run** ends it, which counts as a FAIL that
+  says where you stopped. A secret-looking name (`otp`, `password`, `token`,
+  `code`…) gets a masked field.
+- **In the CLI** it asks on the terminal, with prompts going to stderr so
+  `--json` stays clean. Secret-looking answers aren't echoed and are redacted
+  like any secret. At a pause, Enter goes on and `q` stops. `--yes`
+  continues past pauses without asking. Off a terminal (CI) there's nobody
+  to ask, so the step fails and says to use `--var name=…` or `--yes`. Set
+  `FML_ASK=stdin` to pipe answers in. The report records what was asked and
+  how long it waited (`steps[].asked`), never the answer.
+
+See `examples/ask.fml`.
+
 ### Running a flow from the app
 
 The canvas has a **▶ Run** button (only enabled when the active doc has an

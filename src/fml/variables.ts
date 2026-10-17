@@ -5,6 +5,7 @@
 //   - `@vars` declares a literal default — known right now, in the file.
 //   - `capture.<name>` on an `api` node pulls it out of that node's response —
 //     known only once the flow actually runs.
+//   - `ask.<name>` on any node asks a person for it mid-run (FML-26).
 // Anything referenced but neither declared nor captured is a run-time input:
 // nothing to resolve today (no runner yet — see lore/ideas/flow-execution.md),
 // but naming it here is what lets the property panel tell you "this will need
@@ -14,7 +15,7 @@ import type { FmlDoc, FmlNode } from "./types.ts";
 
 const VAR_RE = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
-export type VarSource = "vars" | "capture";
+export type VarSource = "vars" | "capture" | "ask";
 
 export interface ResolvedVar {
   name: string;
@@ -22,7 +23,7 @@ export interface ResolvedVar {
   /** The literal default, for a `vars` source. Absent for `capture` — that
    *  value only exists once a request actually runs. */
   value?: string;
-  /** The node whose `capture.<name>` defines this, for a `capture` source. */
+  /** The node whose `capture.<name>` (or `ask.<name>`) defines this. */
   capturedBy?: string;
 }
 
@@ -59,10 +60,11 @@ export function resolveVariables(doc: FmlDoc): Map<string, ResolvedVar> {
 
   for (const node of doc.nodes) {
     for (const key of Object.keys(node.data)) {
-      if (!key.startsWith("capture.")) continue;
-      const name = key.slice("capture.".length);
+      const source = key.startsWith("capture.") ? "capture" : key.startsWith("ask.") ? "ask" : null;
+      if (!source) continue;
+      const name = key.slice(source.length + 1);
       if (name && !resolved.has(name)) {
-        resolved.set(name, { name, source: "capture", capturedBy: node.id });
+        resolved.set(name, { name, source, capturedBy: node.id });
       }
     }
   }

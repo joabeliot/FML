@@ -131,7 +131,14 @@ export function isKnownType(type: string): boolean {
  * `query.page`, `capture.token` — so they can appear any number of times in one
  * block. `assert.<path>` scores the response body. Recognised here so tooling can tell a real key from a typo.
  */
-export const EXEC_KEY_PREFIXES = ["header", "query", "capture", "assert", "fill"] as const;
+export const EXEC_KEY_PREFIXES = ["header", "query", "capture", "assert", "fill", "ask"] as const;
+
+/**
+ * Keys any node type may carry. `pause: <message>` waits for a person before
+ * the node acts; with `ask.<name>: <prompt>` (a prefix, above) it's how a run
+ * stops for human input — see run.ts, FML-26.
+ */
+export const ANY_NODE_KEYS = ["pause"] as const;
 
 export function isExecKey(key: string): boolean {
   const dot = key.indexOf(".");

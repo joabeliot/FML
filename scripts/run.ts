@@ -1,7 +1,14 @@
 // Usage: node scripts/run.ts <file.fml> [--doc <name>] [--start <nodeId>]
 //                            [--var name=value ...] [--dry] [--fail-fast]
 //                            [--json] [--report <out.json>]
-//                            [--headed] [--artifacts <dir>]
+//                            [--headed] [--artifacts <dir>] [--yes]
+//
+// A node can stop the run for a person (FML-26): `ask.<name>: <prompt>` asks
+// for a value, `pause: <message>` waits for Enter. On a terminal (or with
+// FML_ASK=stdin, for piping answers in) the CLI asks; prompts go to stderr so
+// --json output stays clean. Elsewhere — CI — supply asked values up front
+// with --var, and pass --yes to continue past pauses; otherwise the step fails
+// saying what it needed.
 //
 // --json prints the machine-readable run report (src/fml/report.ts) instead
 // of the step log; --report writes the same report to a file and keeps the
@@ -23,6 +30,8 @@
 // log, the plan and the report; so is any variable with a secret-looking name.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline";
+import { Writable } from "node:stream";
 import { dirname, resolve as resolvePath } from "node:path";
 import { parse, type FmlDoc } from "../src/fml/index.ts";
 import { buildReport, collectSecrets, makeRedactor, type Redactor } from "../src/fml/report.ts";
@@ -32,6 +41,7 @@ import {
   requiredInputs,
   runFlow,
   uiActions,
+  type AskHandler,
   type HttpRequest,
   type StepResult,
   type Transport,
@@ -205,6 +215,10 @@ function line(step: StepResult): void {
   const captured: Record<string, string> = {};
   for (const c of step.captures) if (c.value !== undefined) captured[c.name] = c.value;
   learnSecrets(captured);
+  for (const a of step.asked ?? []) {
+    const waited = `${(a.waitedMs / 1000).toFixed(1)}s`;
+    console.log(a.kind === "confirm" ? `  ⏸  ${step.nodeId}  continued after ${waited}` : `  ?  ${step.nodeId}  {${a.name}} given after ${waited}`);
+  }
   if (step.passthrough) {
     console.log(`  ·  ${step.nodeId}  (${step.type})`);
     return;
@@ -264,9 +278,53 @@ if (flow.nodes.some((n) => n.type === "ui")) {
   }
 }
 
+/**
+ * Asks on the terminal (FML-26). Secret-looking answers are typed unechoed
+ * and join the redaction set the moment they're given.
+ */
+function terminalAsk(): AskHandler & { close(): void } {
+  let muted = false;
+  const out = new Writable({
+    write(chunk: Buffer, _enc, done) {
+      if (!muted) process.stderr.write(chunk);
+      done();
+    },
+  });
+  const rl = createInterface({ input: process.stdin, output: out, terminal: !!process.stdin.isTTY });
+  const lines = rl[Symbol.asyncIterator]();
+  const handler = async (req: Parameters<AskHandler>[0]) => {
+    const prompt = redact(req.prompt);
+    const head = req.kind === "confirm" ? `\n  ⏸  ${req.nodeId}: ${prompt}\n     Enter to continue, q to stop: ` : `\n  ?  ${req.nodeId}: ${prompt}\n     {${req.name}}${req.secret ? " (hidden)" : ""}: `;
+    process.stderr.write(head);
+    muted = req.secret;
+    const next = await lines.next();
+    muted = false;
+    if (req.secret) process.stderr.write("\n");
+    if (next.done) throw new Error(`input ended before ${req.kind === "value" ? `{${req.name}}` : "the pause"} was answered`);
+    const answer = String(next.value);
+    if (req.kind === "confirm") return answer.trim().toLowerCase() === "q" ? null : "";
+    learnSecrets({ [req.name!]: answer }); // redacted from here on, if it looks secret
+    return answer;
+  };
+  return Object.assign(handler, { close: () => rl.close() });
+}
+
+/** Not interactive, but --yes: pauses go by; asked values must come up front. */
+const pastPauses: AskHandler = async (req) => {
+  if (req.kind === "confirm") return "";
+  throw new Error(`asks a person for {${req.name}} ("${req.prompt}") and this run isn't interactive — supply it up front: --var ${req.name}=…`);
+};
+
+const terminal = process.stdin.isTTY || process.env.FML_ASK === "stdin" ? terminalAsk() : undefined;
+// --yes: pauses go by without a prompt; values are still asked where we can.
+const ask: AskHandler | undefined = has("yes")
+  ? async (req, signal) => (req.kind === "confirm" ? "" : (terminal ?? pastPauses)(req, signal))
+  : terminal;
+
 const startedAt = new Date();
 const run = await runFlow(flow, {
   ...(ui ? { ui } : {}),
+  ...(ask ? { ask } : {}),
   transport: send,
   vars: supplied,
   ...(flag("start") ? { start: flag("start")! } : {}),
@@ -275,6 +333,7 @@ const run = await runFlow(flow, {
 });
 
 await ui?.close();
+terminal?.close();
 
 const reportPath = flag("report");
 if (asJson || reportPath) {
@@ -294,7 +353,9 @@ if (!asJson) {
   console.log(
     `\n${run.ok ? "PASS" : "FAIL"}  ${flow.name}  —  ${run.steps.filter((s) => !s.passthrough).length} request(s), stopped: ${run.stoppedBecause}`,
   );
-  if (run.stoppedBecause === "unmodelled") {
+  if (run.stoppedBecause === "cancelled") {
+    console.log(`  Stopped at "${run.cancelledAt}" — you chose not to continue.`);
+  } else if (run.stoppedBecause === "unmodelled") {
     console.log(
       `  "${run.ambiguousAt}" returned ${run.unmodelledStatus} and no edge leaves it for that status.`,
     );

@@ -1,0 +1,40 @@
+# ask.fml — a run that stops for a person (FML-26).
+#
+#   node scripts/run.ts examples/ask.fml                  # asks on the terminal
+#   node scripts/run.ts examples/ask.fml --yes --var userId=3   # CI: no one to ask
+#
+# `ask.<name>` stops before the node acts and asks for {name}; the answer is
+# there for this node and every one after. `pause` waits until you say go.
+# Neither asks if the value was supplied up front (--var, .fml.env, the run
+# dialog), and --yes continues past pauses. Same public sandbox as run.fml.
+
+@meta
+  title: Asking mid-run
+  base: https://jsonplaceholder.typicode.com
+
+@nodes
+  Start    = page
+  getUser  = api
+  getPosts = api
+  Done     = page
+
+@node getUser {
+  method: GET
+  path: /users/{userId}
+  ask.userId: Which user? (1–10)
+  capture.username: $.username
+  expect: 200
+}
+
+@node getPosts {
+  method: GET
+  path: /posts
+  query.userId: {userId}
+  pause: Look up {username}'s posts?
+  expect: 200
+}
+
+@flow
+  Start -run> getUser
+  getUser -200> getPosts
+  getPosts -200> Done

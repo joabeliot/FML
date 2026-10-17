@@ -347,6 +347,8 @@ export interface StepResult {
   passthrough: boolean;
   /** A `ui` step that didn't run, and why (no driver — the in-app runner). Still `ok`. */
   skipped?: string;
+  /** Questions put to a person before this step acted (FML-26) — never their answers. */
+  asked?: AskRecord[];
   /** What a `ui` step did, in order, and where its screenshot went. */
   ui?: { actions: string[]; screenshot?: string };
   request?: HttpRequest;
@@ -362,7 +364,7 @@ export interface StepResult {
    * Which check `error` is about, when the step failed — the first one in
    * runNode's precedence: no response at all, then status, capture, assert.
    */
-  failedOn?: "request" | "status" | "capture" | "assert" | "ui";
+  failedOn?: "request" | "status" | "capture" | "assert" | "ui" | "ask";
   durationMs?: number;
 }
 
@@ -666,6 +668,93 @@ async function runUiNode(
   };
 }
 
+// -- asking a person mid-run (FML-26) ---------------------------------------
+//
+//   ask.<name>: <prompt>   before the node acts, ask a person for <name>; the
+//                          answer is {name} for this node and every later one.
+//                          Already set (--var, the run dialog, .fml.env)? Not
+//                          asked — that's how a CI run supplies it up front.
+//   pause: <message>       before the node acts, wait until a person says go.
+//
+// Like Transport and UiDriver, the asking is injected (RunOptions.ask): the
+// app shows a dialog, the CLI prompts on the terminal. No handler means
+// nobody can answer — the step fails saying so, rather than hanging.
+
+export interface AskRequest {
+  nodeId: string;
+  kind: "value" | "confirm";
+  /** The variable the answer becomes, for a `value` ask. */
+  name?: string;
+  prompt: string;
+  /** Looks like a secret (an OTP, a password…): mask it, and redact it. */
+  secret: boolean;
+}
+
+/** The answer (`""` for a confirm), or `null` when the person cancels the run. May throw to fail the step. */
+export type AskHandler = (req: AskRequest, signal?: AbortSignal) => Promise<string | null>;
+
+export interface AskRecord {
+  kind: "value" | "confirm";
+  name?: string;
+  /** How long the run waited for the person. */
+  waitedMs: number;
+}
+
+const SECRETISH = /pass|secret|token|otp|code|pin|key|auth|cred/i;
+export const looksSecret = (name: string): boolean => SECRETISH.test(name);
+
+/** What a node will ask before it acts: its `pause`, then each `ask.<name>`, in order. */
+export function askRequests(node: FmlNode): AskRequest[] {
+  const out: AskRequest[] = [];
+  const pause = node.data.pause?.trim();
+  if (pause !== undefined && node.data.pause !== undefined) {
+    out.push({ nodeId: node.id, kind: "confirm", prompt: pause || `Continue past ${node.id}?`, secret: false });
+  }
+  for (const [key, value] of Object.entries(node.data)) {
+    if (!key.startsWith("ask.")) continue;
+    const name = key.slice("ask.".length).trim();
+    if (!name) continue;
+    out.push({ nodeId: node.id, kind: "value", name, prompt: value.trim() || `Value for {${name}}`, secret: looksSecret(name) });
+  }
+  return out;
+}
+
+/** Ask a node's questions. `cancelled` when the person stops the run; `error` when nobody can answer. */
+async function askPerson(
+  node: FmlNode,
+  vars: Record<string, string>,
+  ask: AskHandler | undefined,
+  signal?: AbortSignal,
+): Promise<{ asked: AskRecord[]; cancelled?: boolean; error?: string }> {
+  const asked: AskRecord[] = [];
+  for (const q of askRequests(node)) {
+    if (q.kind === "value" && vars[q.name!] !== undefined) continue; // supplied up front
+    // A prompt can quote what the run knows so far: "Look up {username}'s posts?"
+    const req = { ...q, prompt: interpolate(q.prompt, vars).text };
+    if (!ask) {
+      return {
+        asked,
+        error:
+          req.kind === "value"
+            ? `${node.id}: asks a person for {${req.name}} ("${req.prompt}") and nothing here can ask — supply it up front (--var ${req.name}=…) or run it interactively`
+            : `${node.id}: waits for a person ("${req.prompt}") and nothing here can wait — run it interactively, or pass --yes to continue past pauses`,
+      };
+    }
+    const started = Date.now();
+    let answer: string | null;
+    try {
+      answer = await ask(req, signal);
+    } catch (err) {
+      if (signal?.aborted) throw err; // stopped while waiting: an abort, like a request's
+      return { asked, error: `${node.id}: ${err instanceof Error ? err.message : String(err)}` };
+    }
+    if (answer === null) return { asked, cancelled: true };
+    asked.push({ kind: req.kind, ...(req.name ? { name: req.name } : {}), waitedMs: Date.now() - started });
+    if (req.kind === "value") vars[req.name!] = answer;
+  }
+  return { asked };
+}
+
 // -- walking the flow -----------------------------------------------------
 
 export type StopReason =
@@ -676,7 +765,9 @@ export type StopReason =
   | "ambiguous"
   /** The node branches on status, but the status it actually returned isn't drawn. */
   | "unmodelled"
-  | "aborted";
+  | "aborted"
+  /** A person was asked something mid-run (FML-26) and chose to stop. */
+  | "cancelled";
 
 export interface RunOptions {
   transport: Transport;
@@ -691,6 +782,8 @@ export interface RunOptions {
   maxSteps?: number;
   /** Drives `ui` nodes. Absent: they're skipped (not failed) — see runUiNode. */
   ui?: UiDriver;
+  /** Answers `ask.<name>` / `pause` (FML-26). Absent: a step that needs a person fails, saying so. */
+  ask?: AskHandler;
   /**
    * Stop at the first failed step. Off by default: a status that has a drawn
    * edge is a *modelled* outcome — `-404>` exists to be walked — so the run
@@ -725,6 +818,8 @@ export interface RunResult {
   ambiguousAt?: string;
   /** The status that had nowhere to go, for `unmodelled`. */
   unmodelledStatus?: number;
+  /** The node whose question the person declined, for `cancelled`. */
+  cancelledAt?: string;
 }
 
 function outgoing(edges: FmlEdge[], nodeId: string): FmlEdge[] {
@@ -779,6 +874,7 @@ export async function runFlow(doc: FmlDoc, opts: RunOptions): Promise<RunResult>
   let stoppedBecause: StopReason = "end";
   let ambiguousAt: string | undefined;
   let unmodelledStatus: number | undefined;
+  let cancelledAt: string | undefined;
 
   while (current) {
     if (opts.signal?.aborted) {
@@ -791,7 +887,16 @@ export async function runFlow(doc: FmlDoc, opts: RunOptions): Promise<RunResult>
     }
 
     await opts.onStepStart?.(current);
-    const step: StepResult = await runNode(current, doc.meta, vars, opts.transport, opts.signal, opts.ui);
+    const person = await askPerson(current, vars, opts.ask, opts.signal);
+    if (person.cancelled) {
+      stoppedBecause = "cancelled";
+      cancelledAt = current.id;
+      break;
+    }
+    const asked = person.asked.length > 0 ? { asked: person.asked } : {};
+    const step: StepResult = person.error
+      ? { nodeId: current.id, type: current.type, passthrough: false, captures: [], asserts: [], ok: false, failedOn: "ask", error: person.error, ...asked }
+      : { ...(await runNode(current, doc.meta, vars, opts.transport, opts.signal, opts.ui)), ...asked };
     steps.push(step);
     await opts.onStep?.(step);
 
@@ -799,7 +904,8 @@ export async function runFlow(doc: FmlDoc, opts: RunOptions): Promise<RunResult>
     // missing variable, a dead host. That always ends the walk. So does a
     // ui action that failed: the page is in an unknown state, and every
     // step after it would fail for that reason, not its own.
-    if (!step.ok && (opts.stopOnFailure || step.failedOn === "request" || step.failedOn === "ui")) {
+    // Nobody to answer a question leaves the step's inputs missing — same.
+    if (!step.ok && (opts.stopOnFailure || step.failedOn === "request" || step.failedOn === "ui" || step.failedOn === "ask")) {
       stoppedBecause = "failed";
       break;
     }
@@ -834,12 +940,14 @@ export async function runFlow(doc: FmlDoc, opts: RunOptions): Promise<RunResult>
       steps.every((s) => s.ok) &&
       stoppedBecause !== "ambiguous" &&
       stoppedBecause !== "unmodelled" &&
-      stoppedBecause !== "maxSteps",
+      stoppedBecause !== "maxSteps" &&
+      stoppedBecause !== "cancelled",
     steps,
     vars,
     stoppedBecause,
     ...(ambiguousAt ? { ambiguousAt } : {}),
     ...(unmodelledStatus !== undefined ? { unmodelledStatus } : {}),
+    ...(cancelledAt ? { cancelledAt } : {}),
   };
 }
 
@@ -853,6 +961,8 @@ export function requiredInputs(doc: FmlDoc): string[] {
   for (const node of doc.nodes) {
     for (const key of Object.keys(node.data)) {
       if (key.startsWith("capture.")) supplied.add(key.slice("capture.".length));
+      // Asked mid-run (FML-26), so not needed before it starts.
+      if (key.startsWith("ask.")) supplied.add(key.slice("ask.".length));
     }
   }
   const needed: string[] = [];

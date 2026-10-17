@@ -9,6 +9,7 @@ import { PropertyPanel, type Selection } from "./components/PropertyPanel.tsx";
 import { WalkthroughPanel } from "./components/WalkthroughPanel.tsx";
 import { RunBar, RUN_BAR_COLLAPSED_H, RUN_BAR_H } from "./components/RunBar.tsx";
 import { RunInputs } from "./components/RunInputs.tsx";
+import { AskDialog } from "./components/AskDialog.tsx";
 import { useFlowRun } from "./hooks/useFlowRun.ts";
 import { useFmlChart } from "./hooks/useFmlChart.ts";
 import { useLocalStorage } from "./hooks/useLocalStorage.ts";
@@ -883,6 +884,8 @@ export function App() {
                 />
               );
             })()}
+
+          {run.asking && <AskDialog req={run.asking} onAnswer={run.answer} />}
 
           {askingInputs && (
             <RunInputs

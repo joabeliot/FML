@@ -18,7 +18,7 @@
 
 import { resolveVariables, varsInValue, type FmlDoc } from "../fml/index.ts";
 
-export type InputSource = "capture" | "vars" | "input";
+export type InputSource = "capture" | "ask" | "vars" | "input";
 
 export interface InputPort {
   name: string;
@@ -74,8 +74,9 @@ export function dataGraph(doc: FmlDoc): DataGraph {
     const outputs: string[] = [];
     const names: string[] = [];
     for (const [key, value] of Object.entries(node.data)) {
-      if (key.startsWith("capture.")) {
-        const name = key.slice("capture.".length);
+      if (key.startsWith("capture.") || key.startsWith("ask.")) {
+        // An ask (FML-26) supplies its name like a capture does — a person types it.
+        const name = key.slice(key.indexOf(".") + 1);
         if (name && !outputs.includes(name)) outputs.push(name);
         continue; // a capture's value is a response path, not a reference
       }
@@ -86,11 +87,11 @@ export function dataGraph(doc: FmlDoc): DataGraph {
       const r = resolved.get(name);
       if (!r) return { name, source: "input" };
       if (r.source === "vars") return { name, source: "vars" };
-      return { name, source: "capture", ...(r.capturedBy ? { from: r.capturedBy } : {}) };
+      return { name, source: r.source, ...(r.capturedBy ? { from: r.capturedBy } : {}) };
     });
 
     for (const input of inputs) {
-      if (input.source !== "capture") {
+      if (input.source !== "capture" && input.source !== "ask") {
         if (input.source === "input" && !vars.some((v) => v.name === input.name)) vars.push({ name: input.name, source: "input" });
         wires.push({ id: `data_${varNodeId(input.name)}_${node.id}_${input.name}`, source: varNodeId(input.name), target: node.id, name: input.name });
         continue;

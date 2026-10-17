@@ -475,6 +475,39 @@ try {
     ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 
+  await scenario("a run that stops to ask a person (FML-26)", async () => {
+    const flow = runFlow(api)
+      .replace("  path: /login\n", "  path: /login\n  ask.password: Your password\n")
+      .replace("  path: /me\n", "  path: /me\n  pause: Check the token went through\n")
+      .replace("  me -200> browse\n  browse -> Home\n", "  me -200> Home\n");
+    const { page, problems } = await open({ t: flow });
+    const dialog = page.getByRole("dialog", { name: "The run is waiting for you" });
+
+    await button(page, "▶ Run").click();
+    await dialog.waitFor({ timeout: 10_000 });
+    ok("an asked value isn't requested up front — the run asks at the node", (await dialog.textContent())?.includes("Your password") === true);
+    ok("the bar says it's waiting", await page.getByText("WAITING FOR YOU").isVisible());
+    ok("a secret-looking answer is masked", (await dialog.locator("input").getAttribute("type")) === "password");
+    await dialog.locator("input").fill(PASSWORD);
+    await dialog.locator("input").press("Enter");
+    await page.getByText("Check the token went through").waitFor({ timeout: 10_000 });
+    const pauseText = (await dialog.textContent()) ?? "";
+    ok("then the pause, at the next node", /paused · me/.test(pauseText), pauseText);
+    await dialog.getByRole("button", { name: "Continue" }).click();
+    await button(page, "▶ Run").waitFor({ timeout: 30_000 });
+    await settle(page);
+    ok("answered, the run passes", await page.getByText("PASS", { exact: true }).isVisible());
+
+    await button(page, "▶ Run").click();
+    await dialog.locator("input").fill(PASSWORD);
+    await dialog.locator("input").press("Enter");
+    await dialog.getByRole("button", { name: "Stop run" }).click();
+    await button(page, "▶ Run").waitFor({ timeout: 30_000 });
+    ok("Stop run ends it there, saying where", await page.getByText("you stopped it at me").isVisible());
+    ok("…as a FAIL, not a pass", await page.getByText("FAIL", { exact: true }).isVisible());
+    ok("no console errors", problems.length === 0, problems.join(" | "));
+  });
+
   await scenario("ui steps drive a real browser from the CLI (FML-19)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fml-e2e-"));
     try {

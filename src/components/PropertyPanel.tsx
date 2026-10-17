@@ -261,6 +261,11 @@ function AboutView({
                     → captured by {u.resolved.capturedBy}
                   </span>
                 )}
+                {u.resolved?.source === "ask" && (
+                  <span className="min-w-0 truncate text-ink-mute">
+                    → asked of a person at {u.resolved.capturedBy}
+                  </span>
+                )}
                 {!u.resolved && (
                   <span className="min-w-0 truncate text-warn">→ not set, asked for when run</span>
                 )}

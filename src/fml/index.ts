@@ -28,7 +28,9 @@ export type { LintIssue, LintSeverity } from "./lint.ts";
 export { nodeVarUsage, resolveVariables, varsInNode, varsInValue } from "./variables.ts";
 export type { NodeVarUsage, ResolvedVar, VarSource } from "./variables.ts";
 export {
+  askRequests,
   buildRequest,
+  looksSecret,
   chooseEdge,
   interpolate,
   isStatusLabel,
@@ -54,6 +56,9 @@ export type {
 } from "./report.ts";
 export type { AssertOp, Assertion, AssertOutcome, ParsedAssertion } from "./assert.ts";
 export type {
+  AskHandler,
+  AskRecord,
+  AskRequest,
   AssertResult,
   BuiltRequest,
   CaptureResult,
