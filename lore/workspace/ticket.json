@@ -1047,7 +1047,71 @@
           "detail": "FML-26"
         }
       ]
+    },
+    {
+      "id": "FML-27",
+      "name": "Data ports always visible + variable nodes on the canvas",
+      "description": "Joab: ports should always show so you can connect from another node; and a variable node to create @vars entries and wire them into a node's {name} port. Ports render on every node regardless of the Data toggle (wires still follow Data/selection). Each @vars entry and each run-time input is a small var node with an output port; wires run from it to consumers. Dropping a wire on an input port rewrites that reference; dropping on a card opens the field picker. + Node menu gets Variable; a panel edits name/value/delete.",
+      "context": [
+        "features/node-sockets.md"
+      ],
+      "plan": null,
+      "status": "done",
+      "priority": "P2",
+      "tags": [
+        "editor",
+        "data-wires"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
+      "logs": [
+        {
+          "at": "2026-10-17T10:29:05.997227+00:00",
+          "event": "created",
+          "detail": "FML-27"
+        },
+        {
+          "at": "2026-10-17T10:29:09.869049+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T10:36:38.391433+00:00",
+          "event": "completed",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "id": "FML-28",
+      "name": "Roadmap: skill-tree visual + editing in the view",
+      "description": "Joab sent a game skill-tree reference: radial tree from a centre, square icon tiles (bigger hubs), diamond milestones, straight gold lines lit once a prerequisite is done, each area its own coloured branch, locked tiles dark. Plus edit the roadmap in the view: add feature/milestone, connect by dragging, delete, rename, edit fields (status, description, area, icon, fml, ticket), all written back to the .rml surgically and undoable.",
+      "context": [
+        "features/rml.md"
+      ],
+      "plan": null,
+      "status": "todo",
+      "priority": "P2",
+      "tags": [
+        "rml",
+        "roadmap"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T10:29:06.000549+00:00",
+          "event": "created",
+          "detail": "FML-28"
+        }
+      ]
     }
   ],
-  "counter": 27
+  "counter": 29
 }
