@@ -3,3 +3,7 @@ dist
 *.tsbuildinfo
 .DS_Store
 .firebase
+
+# run-time secrets for flows — never commit (see HOW-TO "Secrets")
+.fml.env
+*.fml.env

@@ -6,6 +6,7 @@
 import { parse } from "./index.ts";
 import { buildReport, collectSecrets, makeRedactor } from "./report.ts";
 import { runFlow, type HttpResponse, type Transport } from "./run.ts";
+import { parseSecretsFile } from "./secrets.ts";
 
 let passed = 0;
 let failed = 0;
@@ -153,6 +154,40 @@ const supplied = { password: "hunter2-very-secret", apiKey: "k-123456" };
   eq("body cut to the limit", r.steps[0]?.response?.body.length, 10);
   eq("flagged as truncated", r.steps[0]?.response?.bodyTruncated, true);
   eq("original size kept", r.steps[0]?.response?.bodyBytes, 100);
+}
+
+// 5. secrets files ---------------------------------------------------------
+{
+  const parsed = parseSecretsFile(
+    [
+      "# a comment",
+      "",
+      "memberToken=eyJ.abc.def",
+      "export appCheck = ac-123  # trailing comment",
+      'quoted="has # inside"',
+      "single='x y'",
+      "empty=",
+      "url=https://a.test/?q=1#frag",
+    ].join("\n"),
+  );
+  eq("values", parsed.values, {
+    memberToken: "eyJ.abc.def",
+    appCheck: "ac-123",
+    quoted: "has # inside",
+    single: "x y",
+    empty: "",
+    url: "https://a.test/?q=1#frag",
+  });
+  eq("no issues", parsed.issues, []);
+
+  const bad = parseSecretsFile("ok=1\nno equals here\nbad-name=2\n");
+  eq("bad lines reported with line numbers", bad.issues.map((i) => i.line), [2, 3]);
+  eq("good lines still load", bad.values, { ok: "1" });
+
+  // Declared secrets are redacted whatever they're called — `appCheck`
+  // doesn't look secret, but it came from the secrets file.
+  const redact = makeRedactor(collectSecrets({ appCheck: "ac-123" }, parsed.values));
+  eq("a declared secret is redacted regardless of its name", redact("x ac-123"), "x [redacted:appCheck]");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

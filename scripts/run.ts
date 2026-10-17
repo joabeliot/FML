@@ -9,13 +9,19 @@
 // Executes an FML flow for real. Node has no CORS, so this runs today — the
 // browser runner is a transport swap away, not a rewrite (see src/fml/run.ts).
 //
-// Secrets: prefer the environment over --var, which lands in shell history.
-// Any `{password}` the file references can be supplied as FML_VAR_password.
+// Run-time inputs, lowest precedence first:
+//   .fml.env beside the flow, or --secrets <file>   (gitignored dotenv file)
+//   FML_VAR_<name>     a plain input from the environment
+//   FML_SECRET_<name>  the same, but always redacted from output
+//   --var name=value   lands in shell history — fine for non-secrets
+// Everything from a secrets file or FML_SECRET_ is redacted by value from the
+// log, the plan and the report; so is any variable with a secret-looking name.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
 import { parse, type FmlDoc } from "../src/fml/index.ts";
-import { buildReport, collectSecrets } from "../src/fml/report.ts";
+import { buildReport, collectSecrets, makeRedactor, type Redactor } from "../src/fml/report.ts";
+import { parseSecretsFile } from "../src/fml/secrets.ts";
 import {
   buildRequest,
   requiredInputs,
@@ -27,7 +33,7 @@ import {
 
 const args = process.argv.slice(2);
 // Flags that take a value — their value is not a positional argument.
-const VALUE_FLAGS = new Set(["--doc", "--start", "--var", "--report"]);
+const VALUE_FLAGS = new Set(["--doc", "--start", "--var", "--report", "--secrets"]);
 const positional = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.has(args[i - 1] ?? ""));
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
@@ -47,11 +53,34 @@ for (let i = 0; i < args.length; i++) {
   const eq = pair.indexOf("=");
   if (eq > 0) cliVars[pair.slice(0, eq)] = pair.slice(eq + 1);
 }
-// FML_VAR_<name> from the environment, overridden by an explicit --var
+// FML_VAR_<name> / FML_SECRET_<name> from the environment, overridden by --var
 const envVars: Record<string, string> = {};
+const envSecrets: Record<string, string> = {};
 for (const [k, v] of Object.entries(process.env)) {
-  if (k.startsWith("FML_VAR_") && v !== undefined) envVars[k.slice("FML_VAR_".length)] = v;
+  if (v === undefined) continue;
+  if (k.startsWith("FML_VAR_")) envVars[k.slice("FML_VAR_".length)] = v;
+  else if (k.startsWith("FML_SECRET_")) envSecrets[k.slice("FML_SECRET_".length)] = v;
 }
+
+// A secrets file: --secrets <path>, else a .fml.env beside the flow if there is one.
+const explicitSecrets = flag("secrets");
+const secretsPath = explicitSecrets ?? resolvePath(dirname(resolvePath(file)), ".fml.env");
+const fileSecrets: Record<string, string> = {};
+if (explicitSecrets !== undefined && !existsSync(secretsPath)) {
+  console.error(`no secrets file at ${secretsPath}`);
+  process.exit(1);
+}
+if (existsSync(secretsPath)) {
+  const parsed = parseSecretsFile(readFileSync(secretsPath, "utf8"));
+  if (parsed.issues.length > 0) {
+    console.error(`${secretsPath} has errors:`);
+    for (const i of parsed.issues) console.error(`  line ${i.line}: ${i.message}`);
+    process.exit(1);
+  }
+  Object.assign(fileSecrets, parsed.values);
+}
+/** Values that are secret by declaration, whatever they're called. */
+const declaredSecrets: Record<string, string> = { ...fileSecrets, ...envSecrets };
 
 const dirOf = new Map<string, string>();
 const resolve = (path: string, from: string | undefined): string | undefined => {
@@ -85,7 +114,7 @@ if (!doc) {
 // that narrowing into the functions below.
 const flow: FmlDoc = doc;
 
-const supplied = { ...envVars, ...cliVars };
+const supplied = { ...fileSecrets, ...envVars, ...envSecrets, ...cliVars };
 const needed = requiredInputs(flow).filter((n) => supplied[n] === undefined);
 if (needed.length > 0) {
   console.error(`missing run-time input(s): ${needed.join(", ")}`);
@@ -93,12 +122,20 @@ if (needed.length > 0) {
   process.exit(1);
 }
 
-/** Show enough of a secret to prove it flowed, never enough to leak it. */
-const SECRETISH = /(token|password|secret|key|auth|bearer|cookie)/i;
-function mask(name: string, value: string): string {
-  if (!SECRETISH.test(name)) return value;
-  return value.length <= 6 ? "•".repeat(value.length) : `${value.slice(0, 4)}…(${value.length})`;
+/**
+ * Every value known to be secret so far — declared ones, secret-looking
+ * supplied ones, and secret-looking captures as the run produces them — and
+ * a redactor over them, rebuilt as captures land.
+ */
+const liveSecrets: Record<string, string> = collectSecrets(supplied, declaredSecrets);
+let redact: Redactor = makeRedactor(liveSecrets);
+function learnSecrets(vars: Record<string, string>): void {
+  const before = Object.keys(liveSecrets).length;
+  Object.assign(liveSecrets, collectSecrets(vars, liveSecrets));
+  if (Object.keys(liveSecrets).length !== before) redact = makeRedactor(liveSecrets);
 }
+const SECRET_HEADERS = /^(authorization|proxy-authorization|cookie|x-api-key)$/i;
+const showHeader = (name: string, value: string): string => (SECRET_HEADERS.test(name) ? "[redacted]" : redact(value));
 
 const send: Transport = async (req: HttpRequest, signal?: AbortSignal) => {
   const r = await fetch(req.url, {
@@ -131,9 +168,9 @@ function printPlan(): void {
       continue;
     }
     const req = built.request!;
-    console.log(`  →  ${node.id}  ${req.method} ${req.url}`);
-    for (const [k, v] of Object.entries(req.headers)) console.log(`        ${k}: ${mask(k, v)}`);
-    if (req.body) console.log(`        body ${req.body}`);
+    console.log(`  →  ${node.id}  ${req.method} ${redact(req.url)}`);
+    for (const [k, v] of Object.entries(req.headers)) console.log(`        ${k}: ${showHeader(k, v)}`);
+    if (req.body) console.log(`        body ${redact(req.body)}`);
     for (const [k, v] of Object.entries(node.data)) {
       if (k.startsWith("capture.")) console.log(`        capture ${k.slice(8)} ← ${v}`);
       else if (k.startsWith("assert.")) console.log(`        assert ${k.slice(7)}: ${v}`);
@@ -148,20 +185,23 @@ function printPlan(): void {
 }
 
 function line(step: StepResult): void {
+  const captured: Record<string, string> = {};
+  for (const c of step.captures) if (c.value !== undefined) captured[c.name] = c.value;
+  learnSecrets(captured);
   if (step.passthrough) {
     console.log(`  ·  ${step.nodeId}  (${step.type})`);
     return;
   }
   const mark = step.ok ? "✔" : "✖";
   const req = step.request;
-  const head = req ? `${req.method} ${req.url}` : "";
+  const head = req ? `${req.method} ${redact(req.url)}` : "";
   const status = step.response ? ` → ${step.response.status}` : "";
   const ms = step.durationMs === undefined ? "" : `  ${step.durationMs}ms`;
   console.log(`  ${mark}  ${step.nodeId}  ${head}${status}${ms}`);
   for (const c of step.captures) {
     console.log(
       c.ok
-        ? `        capture ${c.name} = ${mask(c.name, c.value ?? "")}`
+        ? `        capture ${c.name} = ${redact(c.value ?? "")}`
         : `        capture ${c.name} ✖ nothing at "${c.path}"`,
     );
   }
@@ -169,10 +209,10 @@ function line(step: StepResult): void {
     console.log(
       a.ok
         ? `        assert ${a.label} ✔ ${a.expr}`
-        : `        assert ${a.label} ✖ ${a.expr} — ${a.message ?? "failed"}`,
+        : `        assert ${a.label} ✖ ${a.expr} — ${redact(a.message ?? "failed")}`,
     );
   }
-  if (step.error) console.log(`        ${step.error}`);
+  if (step.error) console.log(`        ${redact(step.error)}`);
 }
 
 if (dry) {
@@ -196,7 +236,7 @@ if (asJson || reportPath) {
     file,
     startedAt: startedAt.toISOString(),
     durationMs: Date.now() - startedAt.getTime(),
-    secrets: collectSecrets({ ...supplied, ...run.vars }),
+    secrets: collectSecrets({ ...supplied, ...run.vars }, declaredSecrets),
   });
   const text = JSON.stringify(report, null, 2);
   if (reportPath) writeFileSync(reportPath, `${text}\n`);

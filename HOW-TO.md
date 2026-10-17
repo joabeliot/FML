@@ -453,12 +453,27 @@ is the worst outcome a test run can have.
 
 **Supplying run-time inputs.** A `{name}` with no `@vars` default and no
 `capture` is an input you pass in — that's the point of leaving secrets out of
-the file:
+the file. Four places, lowest precedence first:
 
 ```bash
-FML_VAR_password=… node scripts/run.ts login.fml     # preferred
-node scripts/run.ts login.fml --var password=…       # lands in shell history
+# 1. a .fml.env beside the flow (gitignored), or --secrets <file>
+#      memberToken=eyJhbGciOi…
+#      export appCheck="abc 123"      # export / quotes optional, # comments ok
+node scripts/run.ts login.fml
+
+FML_VAR_email=jb@arque.app node scripts/run.ts login.fml     # 2. plain input
+FML_SECRET_password=… node scripts/run.ts login.fml         # 3. secret input
+node scripts/run.ts login.fml --var email=jb@arque.app      # 4. lands in shell history
 ```
+
+Anything from a secrets file or `FML_SECRET_` is a **secret by declaration** —
+its value is replaced with `[redacted:<name>]` everywhere the CLI prints:
+the step log, the `--dry` plan and the `--json` report, including inside URLs,
+bodies and a later capture that echoed it back. Variables whose *name* looks
+secret (`token`, `password`, `key`, `auth`, `session`, …) are treated the same
+way without being declared, captured ones included. `.fml.env` and
+`*.fml.env` are in `.gitignore`; an explicit `--secrets` path that doesn't
+exist is an error rather than a silent no-op.
 
 The run refuses to start if any are missing, and refuses to *send* a request
 that still contains an unresolved `{name}` — a literal `{token}` in a header is
@@ -500,8 +515,9 @@ first thing that went wrong, already classified:
 `kind` is one of `request` (nothing was sent — missing variable, no base,
 dead host), `status`, `capture`, `assert`, `unmodelled`, `ambiguous` or
 `maxSteps`. Bodies over 64 KiB are cut, with `bodyTruncated: true` and the
-real `bodyBytes`. **Secrets are redacted by value**: every supplied or captured
-variable whose name looks secret (`token`, `password`, `key`, `auth`,
+real `bodyBytes`. **Secrets are redacted by value**: everything from a secrets
+file or `FML_SECRET_` (see above), plus every supplied or captured variable
+whose name looks secret (`token`, `password`, `key`, `auth`,
 `session`, …) is replaced with `[redacted:<name>]` wherever it shows up — URL,
 header, body, a later capture. `Authorization`, `Cookie`, `Set-Cookie` and
 `X-Api-Key` headers are always hidden.
