@@ -980,7 +980,43 @@
           "detail": "FML-24"
         }
       ]
+    },
+    {
+      "id": "FML-25",
+      "name": "Regression suite: CLI tests in npm test + end-to-end dashboard tests (test:e2e)",
+      "description": "Joab: have test cases for everything done so far so the next feature update can prove nothing existing broke. Delivered: scripts/cli.test.ts (in npm test), scripts/e2e.ts (npm run test:e2e), fixture server, npm run test:all; registry rewritten. Caught three real bugs on the way (drift variable base; FML-20 swallowing portal double-click; drop-on-card connect).",
+      "context": [
+        "testing/registry.md"
+      ],
+      "plan": null,
+      "status": "done",
+      "priority": "P1",
+      "tags": [
+        "testing"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
+      "logs": [
+        {
+          "at": "2026-10-17T10:12:02.710284+00:00",
+          "event": "created",
+          "detail": "FML-25"
+        },
+        {
+          "at": "2026-10-17T10:12:02.733685+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T10:12:02.736849+00:00",
+          "event": "completed",
+          "detail": null
+        }
+      ]
     }
   ],
-  "counter": 25
+  "counter": 26
 }

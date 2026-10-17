@@ -1,13 +1,39 @@
 # Context — F*ML
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre) — and now RML (`.rml` roadmaps, `src/rml/`) on the same grammar
-**Phase:** R&D → the north star is real. Flows execute and check correctness (`assert.*`, bytes, ETag), emit a JSON report with redaction, load secrets from `.fml.env`, and can be checked against an OpenAPI spec (`npm run drift`). The dashboard edits structure (add/delete/rename/connect), shows data wires (capture → `{name}`), and has a Roadmap view for `.rml`. Assertions + structural editing merged to `main` 2026-10-17. Live at https://protoarch.web.app / https://fml.arque.app (not redeployed since the merges)
-**Open:** three stacked branches awaiting JB review, merge in order — `feature/openapi-drift` (FML-18) → `feature/node-sockets` (FML-20) → `feature/rml` (FML-21) → `feature/design-live-sync-ui-steps` (designs + FML-24); FML-16 blocked on Flock repo + staging access; FML-19 (UI steps) design in `ideas/ui-steps.md` awaiting sign-off; FML-24 (live sync v1) awaiting sign-off on `ideas/live-sync.md`'s open questions; lore CLI bug: `lore edit project --shorthand X` on a session with an empty shorthand re-prefixes every ticket id (`FML-1` → `FMLFML-1`) — reverted here with git, worth fixing in joabeliot/lore; decrypt-then-hash (FML-13 follow-up); routing on a captured/asserted value; `#` in values (comment lexer — now also bites CSS selectors for FML-19); no redeploy since the merges; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque
-**Next:** JB reviews the stacked branches in order; then deploy (paired with a push to `main`); sign-off on the FML-19 and FML-24 designs; FML-16 once Flock access exists
+**Phase:** R&D → the north star is real. Flows execute and check correctness (`assert.*`, bytes, ETag), drive a real browser (`ui` nodes, FML-19), emit a JSON report with redaction, load secrets from `.fml.env`, and can be checked against an OpenAPI spec (`npm run drift`). The dashboard edits structure, shows data wires, and has a Roadmap view for `.rml`. Three test layers guard all of it: `npm test` (unit + CLI), `npm run test:e2e` (Playwright, dashboard), `npm run test:all`. Live at https://protoarch.web.app / https://fml.arque.app (not redeployed since the first merges)
+**Open:** PR #1 (`feature/rml`: FML-18/20/21 + two fixes cherry-picked 2026-10-17) verified and ready, but the merge was blocked by the session's permission system, so a human has to merge it; then deploy. Stacked after it: `feature/design-live-sync-ui-steps` (designs, FML-24 filed) → `feature/ui-steps` (FML-19, the regression suite, the same fixes). FML-24 (live sync v1) awaits sign-off on `ideas/live-sync.md`. FML-16 is blocked on Flock access. The lore CLI fix is on joabeliot/lore `fix/shorthand-attach`, local only (that repo's rule: no push without JB's OK). Also open: decrypt-then-hash; routing on a captured value; `#` in values (bites `ui` selectors after a space); `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque
+**Next:** merge PR #1 → deploy; review the stacked branches; sign off FML-24; push the lore fix. Every change runs `npm run test:all` before it ships
 
 ---
 
 ## Log
+
+### 2026-10-17 (cont.) — Joab / Claude — FML-19, regression suite, PR #1, lore fix
+- **PR #1** (JB's, `feature/rml` → main): reviewed (my seven commits only;
+  fast-forward; 11 suites, build and examples clean). The merge was blocked by
+  the session's permission system, so it's left for a human to merge.
+- **FML-19 ui steps** (`feature/ui-steps`): `ui` node type through an
+  injected `UiDriver`; Playwright (devDependency) in `scripts/uiDriver.ts`,
+  bundled Chromium else the machine's Chrome. Keys can't hold CSS, so it's
+  `fill.<field>` (name/id/testid) + a `sel(<css>)` value prefix, and page
+  reads (`text(sel)` …) go at the start of assert/capture values. A failed
+  action stops the walk; no driver means skipped (`–`). `examples/ui.fml`:
+  an API user typed into httpbin's form, passing live.
+- **Regression suite** (Joab: "have test cases for everything"):
+  `scripts/cli.test.ts` (in `npm test`), `scripts/e2e.ts` (`test:e2e`),
+  fixture server, `test:all`; registry rewritten. It caught three real bugs:
+  drift reading `{apiBase}` as a path segment; FML-20 swallowing the
+  double-click that opens a portal (bisected — the wire graph changed
+  identity on every selection change); drop-on-card connects doing nothing
+  (React Flow's ~20px handle radius; it looked like a flaky test). The fixes
+  were cherry-picked onto PR #1's branch, so the deploy won't ship them broken.
+- **lore CLI** (`stablish/projects/lore`, branch `fix/shorthand-attach`):
+  attach now reads the shorthand from ticket.json and points config.yml at
+  the checkout; `ticket add` prefers ticket.json's shorthand; `edit
+  project --shorthand` renames only exact `<old>-<n>` ids. 6 hermetic
+  tests, all failing on the old code. Not pushed.
+Loaded: CLAUDE.md, lore/CONTEXT.md, lore/ideas/ui-steps.md, joabeliot/lore's CLAUDE.md
 
 ### 2026-10-17 (cont.) — Joab / Claude — Drift, data wires, RML, two designs
 Joab: "lets get building rest of the tickets". Both earlier branches had been
