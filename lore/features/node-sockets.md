@@ -45,6 +45,15 @@ an `assert` on it) draws no self-wire.
 | Keeping data and control drags apart, drop target lookup | `src/components/FlowCanvas.tsx` (`isValidConnection`, `onConnectEnd`) |
 | Toggle, data edges, writing the edit (undoable) | `src/App.tsx`, `src/components/Toolbar.tsx` |
 
+## Gotcha (found by the e2e suite)
+
+The visible graph keeps its object identity unless what it shows changes
+(`shownRef` in App). Recomputing it on every selection change rebuilt every
+canvas node, and doing that on the first click of a double-click swallowed
+the double-click, so portal drill-in broke. Selecting a node *with* wires
+still rebuilds, which is harmless because only `flow` nodes use
+double-click.
+
 ## Not done
 
 - Unwiring by dragging a wire off. To remove one, edit the field or the

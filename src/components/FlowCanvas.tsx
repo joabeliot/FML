@@ -361,14 +361,23 @@ export function FlowCanvas({
           if (c.source && c.target) onConnect?.(c.source, c.target);
         }}
         onConnectEnd={(event, state) => {
+          // A completed handle-to-handle connection already went through onConnect.
+          if (state.isValid) return;
           const from = state.fromHandle;
-          if (!onDataDrop || !from || from.type !== "source" || !isDataHandle(from.id)) return;
+          if (!from || from.type !== "source") return;
           const point = "changedTouches" in event ? event.changedTouches[0] : event;
           if (!point) return;
+          // Dropped on a card rather than exactly on its handle: React Flow
+          // only connects within ~20px of a handle, so a drop on the card's
+          // body silently did nothing. Treat the whole card as the target.
           const el = document.elementFromPoint(point.clientX, point.clientY);
           const target = el?.closest<HTMLElement>(".react-flow__node")?.dataset.id;
-          if (!target || target === from.nodeId) return;
-          onDataDrop(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY });
+          if (!target) return;
+          if (isDataHandle(from.id)) {
+            if (target !== from.nodeId) onDataDrop?.(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY });
+          } else {
+            onConnect?.(from.nodeId, target);
+          }
         }}
         // Deleting goes through the .fml (App's key handler), never React
         // Flow's local state — a node removed only on the canvas reappears on
