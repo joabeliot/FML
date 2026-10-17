@@ -1131,7 +1131,302 @@
           "detail": null
         }
       ]
+    },
+    {
+      "id": "FML-29",
+      "name": "Model one real ExpressPay journey end to end (login → OTP → payment) in FML and run it in CI for two weeks",
+      "description": "Nothing has run FML against a real product yet. Model the journey (UX + API in one map), run it on every push, and file what breaks or annoys as tickets. This drives the backlog.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P0",
+      "tags": [
+        "validation",
+        "expresspay"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.661885+00:00",
+          "event": "created",
+          "detail": "FML-29"
+        }
+      ]
+    },
+    {
+      "id": "FML-30",
+      "name": "Route a run on a captured value, not just HTTP status (e.g. kycStatus == pending → Kyc)",
+      "description": "Today two labelled edges with no status stop the run as ambiguous. Evaluate a condition on the edge against the variable store, reusing the assert grammar.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "engine"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.665401+00:00",
+          "event": "created",
+          "detail": "FML-30"
+        }
+      ]
+    },
+    {
+      "id": "FML-31",
+      "name": "Carry variables across flow portals: one run spans docs",
+      "description": "A capture in one @doc/@fof doesn't reach a {name} in the next through a flow portal. Decide the scope (open question in ideas/flow-execution.md) and implement it.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "engine"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.669008+00:00",
+          "event": "created",
+          "detail": "FML-31"
+        }
+      ]
+    },
+    {
+      "id": "FML-32",
+      "name": "Make in-app Run work on the deployed site against non-CORS APIs",
+      "description": "Deployed protoarch.web.app calls fetch directly, so only CORS-permissive APIs work. Options: a tiny local relay the page can talk to (npx fml relay), a browser extension, or a hosted proxy (breaks 'no backend'). Pick one and build it.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "app",
+        "cors"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.672378+00:00",
+          "event": "created",
+          "detail": "FML-32"
+        }
+      ]
+    },
+    {
+      "id": "FML-33",
+      "name": "Decide what FML is: executable app flows (UX + API in one map); roadmap stays a side feature",
+      "description": "It's a diagram editor, API runner, browser driver and roadmap tool at once. Write the one-line positioning and a decision doc so new work is judged against it.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "positioning"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.675730+00:00",
+          "event": "created",
+          "detail": "FML-33"
+        }
+      ]
+    },
+    {
+      "id": "FML-34",
+      "name": "GitHub Action: run .fml flows in CI with the JSON report as an artifact",
+      "description": "uses: joabeliot/fml-action. Runs scripts/run.ts on given files, secrets from repo secrets, uploads the report, fails the job on FAIL.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "adoption",
+        "ci"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.678926+00:00",
+          "event": "created",
+          "detail": "FML-34"
+        }
+      ]
+    },
+    {
+      "id": "FML-35",
+      "name": "VS Code syntax highlighting for .fml and .rml",
+      "description": "TextMate grammar: sections, node declarations, keys, {vars}, edge arrows and labels, comments. Later: lint diagnostics via the CLI.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "adoption",
+        "editor"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.682109+00:00",
+          "event": "created",
+          "detail": "FML-35"
+        }
+      ]
+    },
+    {
+      "id": "FML-36",
+      "name": "A one-page getting-started guide (HOW-TO is 1,100+ lines)",
+      "description": "Draw a flow, run it, check it against a spec, in five minutes. Link to HOW-TO for the rest.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "adoption",
+        "docs"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.685314+00:00",
+          "event": "created",
+          "detail": "FML-36"
+        }
+      ]
+    },
+    {
+      "id": "FML-37",
+      "name": "Deploy main to protoarch.web.app / fml.arque.app (live site is several features behind)",
+      "description": "Run npm run test:all on main, firebase deploy, pair with the main commit.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "deploy"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.688634+00:00",
+          "event": "created",
+          "detail": "FML-37"
+        }
+      ]
+    },
+    {
+      "id": "FML-38",
+      "name": "UX flows 1: conditions on arrows ([cond]), @conditions, screen keys (route, widget, presents, requires), case: edge cases, happy-path toggle, coverage lint + mobile checklist",
+      "description": "From the UX-flows idea discussed 2026-10-17: FML describes UX transitions (trigger + condition + outcome) and edge cases as first-class, not just API calls.",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "ux",
+        "language"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.691869+00:00",
+          "event": "created",
+          "detail": "FML-38"
+        }
+      ]
+    },
+    {
+      "id": "FML-39",
+      "name": "UX flows 2: Simulate — toggle conditions, see the path a user would take; flag unreachable and dead-end screens",
+      "description": "",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "ux"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.695131+00:00",
+          "event": "created",
+          "detail": "FML-39"
+        }
+      ]
+    },
+    {
+      "id": "FML-40",
+      "name": "UX flows 3: Flutter route drift — compare FML screens/routes/guards with the app's go_router config (ExpressPay first)",
+      "description": "",
+      "context": [],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "ux",
+        "flutter"
+      ],
+      "source": "joab: FML review 2026-10-17",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T18:54:01.698401+00:00",
+          "event": "created",
+          "detail": "FML-40"
+        }
+      ]
     }
   ],
-  "counter": 29
+  "counter": 41
 }
