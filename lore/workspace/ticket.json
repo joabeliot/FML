@@ -697,7 +697,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -705,14 +705,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.919953+00:00",
           "event": "created",
           "detail": "FML-18"
+        },
+        {
+          "at": "2026-10-17T09:14:16.030109+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T09:14:16.033775+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:16:48.910210+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
