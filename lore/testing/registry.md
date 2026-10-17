@@ -23,7 +23,7 @@ Live checks (network, not in `npm test`): `node scripts/run.ts` on
 ## Not Covered
 
 - React components and hooks (canvas, property panel, run bar)
-- `scripts/run.ts` CLI flag handling (exercised by hand only; not in `tsc -b`)
+- `scripts/run.ts` CLI flag handling (exercised by hand only; type-checked by `tsc -b`)
 - Browser transports (`src/lib/httpTransport.ts`) — the dev proxy was checked by hand
 
 ## Known Gaps

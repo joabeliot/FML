@@ -2,7 +2,7 @@
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre)
 **Phase:** R&D → the north star is real. **Flows execute and now check correctness**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values, asserts `expect` *and* `assert.<path>` body/header/byte checks (`src/fml/assert.ts`), routes on status. CLI emits a machine-readable report (`--json`/`--report`, `src/fml/report.ts`) with value-based secret redaction, and loads secrets from a gitignored `.fml.env`. Run UI shipped; multi-host `base` merged to `main`; portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
-**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17, 6 commits) is local on Joab's Stablish Mac, not pushed — awaiting JB review before merge/deploy; FML-1..10 are stale protoarque bootstrap tickets (1–4 built, 5–10 obsolete) — need JB's OK to close; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); `scripts/` isn't covered by `tsc -b`; api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; node rename + add/delete node/edge (FML-22); breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
+**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17) pushed to origin — awaiting JB review before merge/deploy; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; node rename + add/delete node/edge (FML-22); breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
 **Next:** JB reviews `feature/assertions-and-runner`, then merge + deploy (paired with a push to `main`); then FML-22 (structural editing) or FML-16 (staging gate, needs Flock access)
 
 ---
@@ -46,7 +46,8 @@ local session and repointed `lore/config.yml` to this clone's paths, marked
 identity set to morpeliot.
 Loaded: CLAUDE.md, lore/INDEX.md, lore/GUARDRAILS.md, lore/CONTEXT.md,
 lore/ideas/flow-execution.md
-Left open: push + JB review; closing FML-1..10 needs JB's OK.
+Left open: JB review of the pushed branch.
+Later the same day: pushed the branch. Reviewed FML-1..10 against the code and closed all ten with a note on each (1–5 and 9 already built, 6 and 10 obsolete after the FML pivot, 7 and 8 superseded by FML-22). Added `scripts/` to `tsconfig.node.json` so `tsc -b` type-checks the CLI.
 Carry forward: on this Mac, `lore/config.yml` differs locally (skip-worktree)
 — `git update-index --no-skip-worktree lore/config.yml` to see it again.
 
