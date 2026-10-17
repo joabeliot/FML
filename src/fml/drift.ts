@@ -150,8 +150,12 @@ function nodePath(node: FmlNode, meta: Record<string, string>): string[] | undef
   const path = node.data.path?.trim();
   if (!path) return undefined;
   if (/^[a-z]+:\/\//i.test(path)) return segmentsOf(path.replace(/^[a-z]+:\/\/[^/]+/i, ""));
-  // A base can carry a path prefix of its own (`https://api.x.com/v1`).
-  const base = (node.data.base?.trim() || meta.base || "").replace(/^[a-z]+:\/\/[^/]+/i, "");
+  // A base can carry a path prefix of its own (`https://api.x.com/v1`). A
+  // base written as a variable (`{apiBase}`, `{apiBase}/v1`) has its origin
+  // in that variable — strip it the same way, or it reads as a path segment.
+  const base = (node.data.base?.trim() || meta.base || "")
+    .replace(/^[a-z]+:\/\/[^/]+/i, "")
+    .replace(/^\{[A-Za-z_][A-Za-z0-9_]*\}/, "");
   return [...segmentsOf(base), ...segmentsOf(path)];
 }
 
