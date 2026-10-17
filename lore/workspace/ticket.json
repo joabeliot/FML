@@ -257,7 +257,7 @@
         "src/fml/nodeTypes.ts"
       ],
       "plan": null,
-      "status": "todo",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "execution",
@@ -267,14 +267,24 @@
       ],
       "source": "Claude",
       "created": "2026-10-09",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-09T10:57:33.172468+00:00",
           "event": "created",
           "detail": "PAQ-11"
+        },
+        {
+          "at": "2026-10-17T07:42:51.081088+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:46:46.259164+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -288,7 +298,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -296,14 +306,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.889826+00:00",
           "event": "created",
           "detail": "FML-12"
+        },
+        {
+          "at": "2026-10-17T07:42:51.063529+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:46:46.261953+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:47:06.342478+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -317,7 +342,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "runner",
@@ -325,14 +350,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.896508+00:00",
           "event": "created",
           "detail": "FML-13"
+        },
+        {
+          "at": "2026-10-17T07:42:51.067381+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:47:55.433481+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:49:42.052548+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -346,7 +386,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -354,14 +394,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.901447+00:00",
           "event": "created",
           "detail": "FML-14"
+        },
+        {
+          "at": "2026-10-17T07:42:51.070932+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:47:06.345603+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:47:55.430329+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -375,7 +430,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "runner",
@@ -383,14 +438,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.906193+00:00",
           "event": "created",
           "detail": "FML-15"
+        },
+        {
+          "at": "2026-10-17T07:42:51.074266+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:49:42.055473+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:51:56.847188+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -433,7 +503,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -441,14 +511,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.915373+00:00",
           "event": "created",
           "detail": "FML-17"
+        },
+        {
+          "at": "2026-10-17T07:42:51.077838+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:51:56.849880+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:53:37.284050+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },

@@ -1,13 +1,54 @@
 # Context — F*ML
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre)
-**Phase:** R&D → the north star is real. **Flows execute**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values between calls, asserts `expect`, routes on status — runnable today via `node scripts/run.ts <file.fml>`. Run UI (canvas-as-test-report, camera-follow) reviewed by JB and shipped. `examples/branching.fml` demonstrates status-based forks. Multi-host per-node `base` override built (`feature/multi-host-base`, not yet reviewed/merged). Portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
-**Open:** multi-host `base` override on `feature/multi-host-base` awaiting JB review before merge; api-node *authoring* UI (first-class fields for method/path/header/capture instead of generic kv rows) not started; run targets the active doc only — a bubble's contents aren't runnable, and a `flow` portal isn't stepped into (the routing half of the cross-doc question); cross-doc variable scope still undecided as a *routing* question — does a run step into a `flow` portal's doc? (the variable half dissolved: one run has one flat store); deployed site can only reach CORS-permissive APIs by design (dev proxy is dev-only); bubble contents are read/edit-only, not draggable; node rename + add/delete node/edge (structural — needs an FmlDoc→text serializer); breadcrumb for portal drill-down (the jump itself works); "Open folder" (File System Access API); sidebar resize; label crowding on primary+reciprocal at one node; `#` in a value is still eaten by the comment lexer (JB's call); `public/index.html` is dead Firebase boilerplate; a handful of `lore/` reference docs (`GUARDRAILS.md`, `INDEX.md`, `architecture/*.md`, `ideas/*.md`, `testing/registry.md`) still say "protoArch" here and there — not yet swept, low-stakes
-**Next:** JB to review the multi-host `base` feature; then first-class `api` authoring fields in the property panel
+**Phase:** R&D → the north star is real. **Flows execute and now check correctness**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values, asserts `expect` *and* `assert.<path>` body/header/byte checks (`src/fml/assert.ts`), routes on status. CLI emits a machine-readable report (`--json`/`--report`, `src/fml/report.ts`) with value-based secret redaction, and loads secrets from a gitignored `.fml.env`. Run UI shipped; multi-host `base` merged to `main`; portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
+**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17, 6 commits) is local on Joab's Stablish Mac, not pushed — awaiting JB review before merge/deploy; FML-1..10 are stale protoarque bootstrap tickets (1–4 built, 5–10 obsolete) — need JB's OK to close; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); `scripts/` isn't covered by `tsc -b`; api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; node rename + add/delete node/edge (FML-22); breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
+**Next:** JB reviews `feature/assertions-and-runner`, then merge + deploy (paired with a push to `main`); then FML-22 (structural editing) or FML-16 (staging gate, needs Flock access)
 
 ---
 
 ## Log
+
+### 2026-10-17 — Joab / Claude — Assertions, bytes, run report, secrets
+Session on Joab's Stablish Mac (`stablish/projects/FML`, cloned via the
+morpeliot gh account). Joab signed off on the tickets that needed no input:
+FML-11, 12, 13, 14, 15, 17 — all done, one commit each on
+`feature/assertions-and-runner` (not pushed).
+
+- **FML-11 body assertions** — `assert.<path>: <comparison>`. The key suffix
+  is the path; a value starting with `$` names its own path (keys can't spell
+  `$` or `[0]`). Exact (numeric-aware), quoted string, `!= >= <= > <`,
+  `~N+-T` / `~N+-T%`, `matches`, `exists`, `absent`. **Decision: tolerance is
+  explicit only — a bare `~N` is rejected**, not given a hidden 1% default.
+  Captures → expect → asserts; a failed assert scores red and still walks the
+  edge, like `expect`. `readPath` gained `.length` on arrays.
+- **FML-12** — the regex/exists/absent operators came with FML-11's grammar;
+  header paths needed no engine change. Tests pin the Flock weak-ETag case.
+- **FML-14** — `examples/conditional-get.fml`: ETag captured, replayed (304),
+  replayed weakened as `W/…` (still 304 per RFC 9110), plus a never-issued tag
+  (200). Green against httpbin.org; a fake exact-match origin fails it.
+- **FML-13** — `HttpResponse.bytes` kept by all transports (dev proxy now
+  ships base64). `body.sha256` (Web Crypto, no dep) and `body.bytes`. Range
+  needed nothing new. `examples/bytes.fml` green live, incl. 64 non-UTF-8 bytes.
+- **FML-15** — `--json` is now a stable report (`schema: 1`) with a classified
+  `failure` (request/status/capture/assert/unmodelled/ambiguous/maxSteps);
+  `--report <file>` too. `runNode` records `failedOn`. **Breaking:** `--json`
+  no longer dumps the raw `RunResult`.
+- **FML-17** — `.fml.env` beside the flow or `--secrets <file>`, new
+  `FML_SECRET_` prefix; redaction by value across log, plan and report
+  (replaced the name-only `mask()`, which leaked secrets in URLs and bodies).
+
+Tests: 7 suites (new `report.test.ts`), all green; `npm run build` clean; every
+example lints clean; run/multi-host/branching still PASS live.
+Fixes along the way: the lore CLI couldn't see this project here — attached a
+local session and repointed `lore/config.yml` to this clone's paths, marked
+`skip-worktree` so it never gets committed over Joab's paths. Repo-local git
+identity set to morpeliot.
+Loaded: CLAUDE.md, lore/INDEX.md, lore/GUARDRAILS.md, lore/CONTEXT.md,
+lore/ideas/flow-execution.md
+Left open: push + JB review; closing FML-1..10 needs JB's OK.
+Carry forward: on this Mac, `lore/config.yml` differs locally (skip-worktree)
+— `git update-index --no-skip-worktree lore/config.yml` to see it again.
 
 ### 2026-09-23 — JB / Claude — Multi-host support
 JB pasted a feature spec from a Stablish fixture he hit running FML for real:
