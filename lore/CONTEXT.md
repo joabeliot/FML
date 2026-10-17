@@ -2,12 +2,37 @@
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre)
 **Phase:** R&D → the north star is real. **Flows execute and now check correctness**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values, asserts `expect` *and* `assert.<path>` body/header/byte checks (`src/fml/assert.ts`), routes on status. CLI emits a machine-readable report (`--json`/`--report`, `src/fml/report.ts`) with value-based secret redaction, and loads secrets from a gitignored `.fml.env`. Run UI shipped; multi-host `base` merged to `main`; portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
-**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17) pushed to origin — awaiting JB review before merge/deploy; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; node rename + add/delete node/edge (FML-22); breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
-**Next:** JB reviews `feature/assertions-and-runner`, then merge + deploy (paired with a push to `main`); then FML-22 (structural editing) or FML-16 (staging gate, needs Flock access)
+**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17) awaiting JB review; `feature/structural-editing` (FML-22) is stacked on it — merge after; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
+**Next:** JB reviews both branches (assertions first, structural editing stacked on it), then merge + deploy (paired with a push to `main`); then FML-16 (staging gate, needs Flock access) or FML-20 (node sockets, builds on FML-22's write-back)
 
 ---
 
 ## Log
+
+### 2026-10-17 (cont.) — Joab / Claude — Structural editing (FML-22)
+Branch `feature/structural-editing`, stacked on `feature/assertions-and-runner`.
+Joab: "for the layout i dont have a clear idea... do whats minimal and feels
+right for the ux".
+
+- `src/lib/fmlStructure.ts`: addNode / deleteNode (cascades to block, edges,
+  emptied groups) / renameNode (id tokens only — labels and comments
+  untouched) / addEdge (joins the source's group, else inline at end of
+  @flow) / deleteEdge. Line splices scoped to one @doc; no-op on bad input.
+- UI: `+ Node` type menu in the toolbar (new node selected), editable id
+  field, drag handle → handle to connect (new edge selected for labelling),
+  Delete button + ⌫, ⌘Z undo (in-memory, 50 deep).
+- Fixed on the way: (1) `fmlEdit` label/note edits silently did nothing on a
+  flow line with a trailing `# comment`; (2) the canvas auto-fit ran before a
+  new node reached React Flow's store, so it framed the old graph and never
+  refit — a node added (or typed into Source) could land off screen;
+  (3) React Flow's default Backspace removed a node from the canvas only
+  (it reappeared on the next parse) — now deleteKeyCode is off and ⌫ edits
+  the file.
+- Tests: new `fmlStructure.test.ts` (48, incl. delete+rename of all 90
+  example nodes), 3 regression tests in `fmlEdit.test.ts`. 8 suites green,
+  build clean. UI verified by driving the dev server in a headless browser.
+Loaded: CLAUDE.md, lore/CONTEXT.md, lore/testing/registry.md
+Left open: edge re-targeting by drag; undo doesn't survive reload.
 
 ### 2026-10-17 — Joab / Claude — Assertions, bytes, run report, secrets
 Session on Joab's Stablish Mac (`stablish/projects/FML`, cloned via the

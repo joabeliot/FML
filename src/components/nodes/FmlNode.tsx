@@ -51,7 +51,11 @@ export function FmlNode({ id, data, selected }: NodeProps<FmlFlowNode>) {
           : undefined;
 
   const handleClass = (visible: boolean) =>
-    visible ? "!h-1.5 !w-1.5 !bg-[#3d3d3d]" : "!h-1 !w-1 !bg-transparent !opacity-0";
+    // The visible pair doubles as the drag-to-connect grip — a touch bigger
+    // than a dot, and lit on hover so it reads as something you can pull.
+    visible
+      ? "!h-2 !w-2 !border-0 !bg-[#3d3d3d] transition-colors hover:!bg-[var(--color-accent)]"
+      : "!h-1 !w-1 !bg-transparent !opacity-0";
 
   return (
     <div className="relative">

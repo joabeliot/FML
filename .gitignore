@@ -7,3 +7,4 @@ dist
 # run-time secrets for flows — never commit (see HOW-TO "Secrets")
 .fml.env
 *.fml.env
+.gstack/

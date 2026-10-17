@@ -51,3 +51,14 @@ export function savePositions(docKey: string, positions: Record<string, Pos>): v
   store[docKey] = { ...store[docKey], ...positions };
   writeStore(store);
 }
+
+/** Carry a dragged position over to a node's new id after a rename. */
+export function renamePosition(docKey: string, from: string, to: string): void {
+  const store = readStore();
+  const doc = store[docKey];
+  const pos = doc?.[from];
+  if (!doc || !pos) return;
+  delete doc[from];
+  doc[to] = pos;
+  writeStore(store);
+}

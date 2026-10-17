@@ -7,7 +7,7 @@ const NODES_HEADER = /^\s*@nodes\s*$/;
 const cleanLabel = (raw: string) => raw.replace(/^[-\s]+|[-\s]+$/g, "");
 
 /** Line range [start, end) holding one doc's body. */
-function docSpan(lines: string[], docName: string): { start: number; end: number } {
+export function docSpan(lines: string[], docName: string): { start: number; end: number } {
   const headers: { name: string; line: number }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const m = DOC_HEADER.exec(lines[i]!);
@@ -219,6 +219,20 @@ interface EdgeLine {
   open: boolean;
   /** Index of the block's closing `}`; -1 when there is no block. */
   close: number;
+  /** A trailing `# comment` on the line (with the space before it), kept on rewrite. */
+  comment: string;
+}
+
+/** Split a line at its comment — `#` at column 0 or after whitespace, as the parser lexes it. */
+function splitComment(raw: string): { code: string; comment: string } {
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "#" && (i === 0 || raw[i - 1] === " " || raw[i - 1] === "\t")) {
+      const code = raw.slice(0, i);
+      const kept = code.replace(/\s+$/, "");
+      return { code: kept, comment: raw.slice(kept.length) };
+    }
+  }
+  return { code: raw, comment: "" };
 }
 
 /** Index of the `}` closing a note block opened on `openAt`, or -1. */
@@ -245,7 +259,8 @@ function findEdgeLine(
   let group: string | null = null;
 
   for (let i = start; i < end; i++) {
-    const line = lines[i]!;
+    // Match the code, not the comment — `A -x> B   # why` is still an edge.
+    const { code: line, comment } = splitComment(lines[i]!);
 
     const inl = INLINE_EDGE.exec(line);
     const grp = inl ? null : GROUP_EDGE.exec(line);
@@ -269,6 +284,7 @@ function findEdgeLine(
             inl ? `${indent}${inl[2]} ${seg(label)} ${tgt}` : `${indent}${seg(label)} ${tgt}`,
           open,
           close,
+          comment,
         };
       }
 
@@ -299,7 +315,7 @@ export function setEdgeLabel(
   const { start, end } = docSpan(lines, docName);
   const hit = findEdgeLine(lines, start, end, edge);
   if (!hit) return src;
-  lines[hit.index] = `${hit.render(newLabel)}${hit.open ? " {" : ""}`;
+  lines[hit.index] = `${hit.render(newLabel)}${hit.open ? " {" : ""}${hit.comment}`;
   return lines.join("\n");
 }
 
@@ -327,7 +343,7 @@ export function setEdgeNote(
   const span = hit.open && hit.close !== -1 ? hit.close - hit.index + 1 : 1;
 
   const replacement =
-    entries.length > 0 ? [`${head} {`, ...body, `${hit.indent}}`] : [head];
+    entries.length > 0 ? [`${head} {${hit.comment}`, ...body, `${hit.indent}}`] : [`${head}${hit.comment}`];
 
   lines.splice(hit.index, span, ...replacement);
   return lines.join("\n");

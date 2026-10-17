@@ -246,5 +246,16 @@ const SINGLE = `# a comment
   ok("code-tab type swap", r.doc.nodes.find((x) => x.id === "Login")!.type === "decision");
 }
 
+// A trailing comment on a flow line used to make the edge invisible to these
+// edits — the regexes required the line to end right after the target.
+{
+  const src = "@nodes\n  A = page\n  B = page\n@flow\n  A -go> B   # why we go\n";
+  const relabelled = setEdgeLabel(src, "main", { source: "A", target: "B", label: "go" }, "leave");
+  ok("relabels a commented flow line", relabelled.includes("A -leave> B   # why we go"), relabelled);
+  const noted = setEdgeNote(src, "main", { source: "A", target: "B", label: "go" }, { note: "x" });
+  ok("adds a note to a commented flow line", noted.includes("A -go> B {   # why we go\n    note: x\n  }"), noted);
+  ok("which still parses as one edge with its note", parse(noted).doc.edges[0]?.data?.note === "x");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

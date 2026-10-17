@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import type { FmlIssue } from "../fml/index.ts";
+import { NODE_TYPES, type FmlIssue } from "../fml/index.ts";
+import { kindColor } from "../lib/nodeStyle.ts";
+import { Glyph } from "./Glyph.tsx";
 import { fileKey } from "../types/workspace.ts";
 
 interface Props {
@@ -18,6 +20,8 @@ interface Props {
   running: boolean;
   onRun: () => void;
   onStop: () => void;
+  /** Declare a new node of this type in the active doc. */
+  onAddNode: (type: string) => void;
 }
 
 const btn =
@@ -49,6 +53,22 @@ export function Toolbar(props: Props) {
       document.removeEventListener("keydown", onKey, true);
     };
   }, [issuesOpen]);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const addRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!addOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!addRef.current?.contains(e.target as Node)) setAddOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAddOpen(false);
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [addOpen]);
 
   // A stale-closed dropdown should not linger once the issues clear.
   useEffect(() => {
@@ -120,6 +140,42 @@ export function Toolbar(props: Props) {
       >
         {props.running ? "■ Stop" : "▶ Run"}
       </button>
+      <span className={sep} />
+
+      {/* Add a node: pick a type, get a declared node with a fresh id, already
+          selected so it can be renamed and filled in from the property panel. */}
+      <div ref={addRef} className="relative">
+        <button
+          className={`${btn} ${addOpen ? on : idle} ${props.running ? "cursor-not-allowed opacity-40" : ""}`}
+          disabled={props.running}
+          onClick={() => setAddOpen((v) => !v)}
+          title="Add a node to this doc"
+        >
+          + Node
+        </button>
+        {addOpen && (
+          <div className="absolute left-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-xl border border-line bg-surface p-1 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.7)]">
+            {NODE_TYPES.map((t) => (
+              <button
+                key={t.type}
+                className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
+                onClick={() => {
+                  setAddOpen(false);
+                  props.onAddNode(t.type);
+                }}
+              >
+                <span className="mt-[1px]" style={{ color: kindColor(t.type) }}>
+                  <Glyph kind={t.type} size={12} />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[11.5px] font-medium text-ink">{t.label}</span>
+                  <span className="text-[10.5px] leading-snug text-ink-mute">{t.summary}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <span className={sep} />
 
       <button className={`${btn} ${idle}`} onClick={() => fileRef.current?.click()}>

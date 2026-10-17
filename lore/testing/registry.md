@@ -13,7 +13,8 @@
 | Engine | `src/fml/run.test.ts` | unit, fake transport | interpolation, `readPath` (incl. `.length`, `body.sha256`/`body.bytes`), status matching, request building, captures, `assert.*` grammar + evaluation, header asserts (weak ETag), conditional GET against fake origins, Range/206/416, routing, guards |
 | Lint | `src/fml/lint.test.ts` | unit | typo'd keys, base checks, malformed asserts, listed examples lint clean |
 | Run report | `src/fml/report.test.ts` | unit, fake transport | report shape, failure classification, value-based redaction, body truncation, `.fml.env` parsing |
-| Write-back | `src/lib/fmlEdit.test.ts` | unit | targeted text surgery survives comments/formatting |
+| Write-back | `src/lib/fmlEdit.test.ts` | unit | targeted text surgery survives comments/formatting, incl. flow lines with a trailing `# comment` |
+| Structural edits | `src/lib/fmlStructure.test.ts` | unit + example sweep | add/delete/rename node, add/delete edge, doc-local, no-ops; deletes and renames every node in every example (90) and re-parses |
 
 Live checks (network, not in `npm test`): `node scripts/run.ts` on
 `examples/run.fml`, `multi-host.fml`, `branching.fml`, `conditional-get.fml`,
@@ -22,7 +23,7 @@ Live checks (network, not in `npm test`): `node scripts/run.ts` on
 
 ## Not Covered
 
-- React components and hooks (canvas, property panel, run bar)
+- React components and hooks (canvas, property panel, run bar) — structural editing UI was checked by hand in a headless browser (add, rename, drag-connect, label, ⌫, panel Delete, ⌘Z)
 - `scripts/run.ts` CLI flag handling (exercised by hand only; type-checked by `tsc -b`)
 - Browser transports (`src/lib/httpTransport.ts`) — the dev proxy was checked by hand
 
