@@ -1093,7 +1093,7 @@
         "features/rml.md"
       ],
       "plan": null,
-      "status": "todo",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "rml",
@@ -1101,14 +1101,24 @@
       ],
       "source": "Joab",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T10:29:06.000549+00:00",
           "event": "created",
           "detail": "FML-28"
+        },
+        {
+          "at": "2026-10-17T10:37:44.467997+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T10:52:58.238561+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     }
