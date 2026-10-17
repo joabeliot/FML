@@ -1016,7 +1016,38 @@
           "detail": null
         }
       ]
+    },
+    {
+      "id": "FML-26",
+      "name": "Pause for human input mid-run: a flow stops, asks for a value, continues on confirm",
+      "description": "Joab: a run should be able to pause in the middle for human intervention — e.g. a step needs data only a person can provide (an OTP from SMS/email, a 2FA code, approving something in another app, a value read off a device). The flow pauses at that point, asks for it, and once the person confirms it carries on with the value available as {name} to later nodes.\n\nNot started — to be designed when picked up. Things to decide then:\n- How it's written: a new node type (e.g. `input`/`pause`) vs a key on an existing node (e.g. `ask.<var>: prompt text` on api/ui/page nodes, asked before the node runs).\n- Shape of the pause: value entry (one or more named fields, secret-ish ones masked), or a plain 'continue when ready' checkpoint with no value (e.g. 'approve the push notification, then click Continue').\n- Engine: run.ts stays network/UI-agnostic — inject an ask hook in RunOptions (like Transport/UiDriver); the walk awaits it. Cancel = abort the run cleanly.\n- Where: in-app runner (modal like RunInputs, run bar shows 'waiting for you'); CLI (prompt on stdin when interactive; non-interactive/CI must not hang — fail fast or take the value from --var / FML_VAR_ / .fml.env if supplied up front).\n- Asked values are run-time inputs: never written to the file, redacted like secrets when they look secret.\n- Report: --json records that the step waited and for how long (not the value).\n- Tests: engine with a fake ask hook; CLI with piped stdin and with non-interactive; e2e for the in-app modal.",
+      "context": [
+        "ideas/flow-execution.md",
+        "../src/fml/run.ts",
+        "../src/hooks/useFlowRun.ts",
+        "../src/components/RunInputs.tsx"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "execution",
+        "ux"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T10:16:01.487580+00:00",
+          "event": "created",
+          "detail": "FML-26"
+        }
+      ]
     }
   ],
-  "counter": 26
+  "counter": 27
 }
