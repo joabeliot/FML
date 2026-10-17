@@ -509,7 +509,128 @@
           "detail": "FML-19"
         }
       ]
+    },
+    {
+      "id": "FML-20",
+      "name": "Node sockets: visual variable wiring between nodes",
+      "description": "Raised by JB 2026-10-17, reference image attached (Blender/node-editor\nsockets: typed in/out ports on a node, wired to another node's port).\n\nProblem: a captured value is invisible plumbing today. capture.token on one\nnode creates {token}; a later node spends it by *typing* {token} into a\ntext field (auth, body, header.*, query.*, path). The data flow exists but\nis never drawn -- you have to read two nodes' property panels side by side\nto see it.\n\nWhat to build: make the wiring visible and draggable, the way Blender's\nsockets work.\n  - Output ports: one per capture.<name> key a node has.\n  - Input ports: one per distinct {name} the node references anywhere in\n    its data (not per-field -- a name used in both header.X and body is one\n    port, same variable).\n  - Dragging a wire from an output port to an input port writes the same\n    text a person would type by hand -- this is a new EDITOR interaction,\n    not new engine behavior. src/fml/run.ts resolves {name} identically\n    whichever way it got there. Write-back goes through src/lib/fmlEdit.ts\n    the same as every other property-panel edit does today.\n\nOpen design questions -- decide before building, don't guess:\n  1. Is a variable wire a second, visually distinct connection layer on the\n     same canvas as the @flow arrows, or does it live somewhere else (a\n     separate inspector view)? Leaning: second layer, same canvas,\n     different color/style -- @flow edges are control flow (what runs\n     next), variable wires are data flow (what value goes where). Blender\n     keeps both on one graph; FML's @flow edges already ARE a graph on this\n     canvas, so a second edge type reusing the same rendering machinery\n     (src/components/edges/FlowEdge.tsx) is the natural fit -- but it needs\n     its own visual language so the two are never confused at a glance.\n  2. A field is free text, not a single typed slot -- `auth: bearer {token}`\n     has a variable embedded in a literal string, not standing alone. Does\n     a wire only connect to a field where the ENTIRE value is one {name}\n     (simple, limited), or can dropping a wire onto a field insert {name}\n     at the cursor / append it (matches how a person would actually type\n     it, more useful, more edge cases: what if the field already has a\n     different {name} in it, what does the wire visually anchor to then)?\n  3. A node can reference the same {name} more than once in different\n     fields (header.Authorization and a body field, say) -- does that\n     collapse to one input port with multiple wires fanning in from the\n     same source, or does connecting a wire from the port itself handle\n     writing it into whichever field the person is looking at?\n\nNon-goal: this does not change what @vars/capture mean or how run.ts\nresolves them -- see src/fml/variables.ts and lore/ideas/flow-execution.md\nfor how that already works. Pure editor/canvas feature.",
+      "context": [
+        "lore/tickets/assets/node-socket-linking-reference.png",
+        "src/fml/variables.ts",
+        "src/lib/fmlEdit.ts"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "ui",
+        "canvas",
+        "variables",
+        "editor"
+      ],
+      "source": "JB",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T07:29:22.660688+00:00",
+          "event": "created",
+          "detail": "FML-20"
+        }
+      ]
+    },
+    {
+      "id": "FML-21",
+      "name": "RML: RoadMap Language — sibling tool to FML for project roadmaps",
+      "description": "Raised by JB 2026-10-17, reference image attached (a game tech-tree: muted\nvs. lit nodes, nodes with multiple incoming dependencies, grouped by\ncolour/category).\n\nThe idea: FML maps an API flow so you can see the logic executing. RML maps\na PROJECT so you can see where you are and what's next -- same visual\nlanguage (a typed, connected node graph), different subject. \"lore and fml\nare interlinked tools\" -- RML is explicitly meant to be the third leg: a\nroadmap node links out to the .fml file that proves it and the lore ticket\ndriving it.\n\nWhat to build:\n  - A new file type, .rml, structurally analogous to .fml: nodes + edges,\n    but nodes are milestones/features and edges mean DEPENDS ON, not FLOWS\n    TO. A node can depend on several others at once -- a DAG, not a tree\n    (see reference image: nodes merge from multiple parents).\n  - Architecture call, not forced, but worth starting from: FML's grammar\n    (@meta / @nodes / @node <id> {} / arrows with -label>) is already\n    generic enough to carry this -- it doesn't encode \"flow\" semantics\n    anywhere in the parser itself, that meaning lives in nodeTypes.ts and\n    in how run.ts walks edges. Reusing src/fml/parse.ts's block/edge\n    grammar with a new node-type vocabulary (RML's equivalent of\n    nodeTypes.ts) avoids re-implementing comment handling, line-oriented\n    parsing, @fof-style includes, etc. a second time. Worth a real look\n    before deciding to hand-roll a second parser.\n  - A new top-center window/tab in the dashboard, alongside the existing\n    doc list, to open and view .rml files -- same app, new view mode, not\n    a separate deployed site.\n  - Visual node state: muted (not done) vs. lit (done) at minimum --\n    confirm with JB whether a third \"in progress\" state is wanted; the\n    reference image reads as binary (locked/unlocked) but a roadmap\n    arguably wants three.\n  - Hover a node: title + one-line description (tooltip).\n  - Click a node: opens a side panel (reuse the PropertyPanel pattern) with\n    the full description, plus:\n      - links to .fml files\n      - links to lore tickets (FML-11-style ids)\n    First cut can be a plain-text reference (just display \"FML-11\" / a\n    file path as a label) rather than a live, resolved link -- see the\n    dependency note below before promising more than that.\n\nDependency / open question: resolving a lore ticket link (showing the\nticket's actual name/status, not just its id) means reading\nlore/workspace/ticket.json off disk from inside the browser app. That's\ndownstream of the \"Open folder\" / File System Access API item already\nsitting in lore/CONTEXT.md's Open line -- RML shouldn't quietly reinvent\nthat. Decide: v1 ships with plain-text id labels and no live resolution, or\nthis waits on File System Access landing first.\n\nNon-goal for v1: auto-deriving a node's muted/lit state from its linked\nticket's status. Useful eventually, but it's a second system (RML) reading\nand trusting a third (ticket.json) automatically -- start with a human (or\nagent) setting status: done/pending by hand on the rml node itself.",
+      "context": [
+        "lore/tickets/assets/rml-roadmap-reference.png",
+        "src/fml/parse.ts",
+        "src/fml/nodeTypes.ts",
+        "lore/CONTEXT.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "rml",
+        "language",
+        "ui",
+        "new-tool"
+      ],
+      "source": "JB",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T07:29:38.493448+00:00",
+          "event": "created",
+          "detail": "FML-21"
+        }
+      ]
+    },
+    {
+      "id": "FML-22",
+      "name": "Create/delete nodes and edges from the dashboard",
+      "description": "Raised by JB 2026-10-17 as part of a larger ask (\"create nodes in the web\ndashboard\"), split into its own ticket -- this part is concretely scoped;\nsee FML-23 for the live-sync half, which isn't.\n\nAlready flagged in lore/CONTEXT.md's Open line: \"node rename + add/delete\nnode/edge (structural -- needs an FmlDoc->text serializer)\". This ticket is\nthat item, written up properly.\n\nProblem: every edit the dashboard can make today is targeted text surgery\non an EXISTING node/edge's span (src/lib/fmlEdit.ts -- \"never re-serialises\nthe whole file\", by design, so comments and formatting survive). There's no\noperation for \"this node doesn't exist in the text yet\" -- you can't add a\nnode, delete a node, or add/delete an edge from the UI at all today.\n\nWhat to build: the missing serializer half. Given an FmlDoc plus one\nstructural op (add node, delete node, add edge, delete edge), produce the\nminimal text edit that does it -- same philosophy as fmlEdit.ts's existing\nedits (surgical, not a full re-print of the doc), but these ops don't have\nan existing span to anchor to, so this is new logic, not an extension of\nthe current targeted-replace functions.\n  - Add node: insert an @nodes declaration line + an empty @node <id> {}\n    block (or no block at all if the type has no expected keys -- a bare\n    `Foo = page` is a complete, valid sketch, same as today's parser\n    allows).\n  - Delete node: remove its @nodes line, its @node {} block if present, and\n    every @flow edge that touches it (orphaned edges are worse than a\n    missing node).\n  - Add/delete edge: a new/removed @flow line, including the grouped-edge\n    syntax (multiple labelled arrows off one source) that already exists in\n    the grammar.\n  - Needs a place in the file to insert into -- decide where new content\n    goes (end of @nodes / end of @flow, or some locality-preserving\n    heuristic). Simplest correct answer: append; revisit only if JB finds\n    it unreadable in practice.\n\nThis directly unblocks RML's \"create nodes in the dashboard\" requirement\ntoo (FML-21) -- RML will want the same structural-edit capability for\n.rml, so whatever shape this takes should be reusable, not FML-specific\nwhere it doesn't have to be.\n\nNon-goal: this ticket is about the file edit, not UI chrome (an \"add node\"\nbutton, a node-type picker, etc.) -- those are straightforward once the\nserializer exists and don't need their own ticket.",
+      "context": [
+        "src/lib/fmlEdit.ts",
+        "lore/CONTEXT.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P1",
+      "tags": [
+        "ui",
+        "editor",
+        "write-back"
+      ],
+      "source": "JB",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T07:29:52.264907+00:00",
+          "event": "created",
+          "detail": "FML-22"
+        }
+      ]
+    },
+    {
+      "id": "FML-23",
+      "name": "Live agent<->dashboard sync, no manual save (design-first)",
+      "description": "Raised by JB 2026-10-17 as part of a larger ask, split from FML-22 (adding\nnodes in the dashboard) because this half is a different shape of problem --\nopen-ended, not yet scoped to an implementation. JB's own words: \"if\ndashboard isn't the right tool for this am willing to look for other\noptions too\" -- treat that as real, not a formality. Design this before\nbuilding it.\n\nThe ask: when an agent (Claude Code, Codex, etc.) edits a .fml/.rml file on\ndisk directly, the open dashboard reflects the change live -- no save\nbutton, no manual reload. And the reverse direction (JB edits the canvas,\nthe agent sees it without JB saving) is implied too -- \"like cowork\".\n\nWhy this doesn't have a cheap answer:\n  - A static site has nothing to watch a file with. The browser's only\n    primitive is File System Access (showDirectoryPicker + a handle), which\n    gets you read access but no push-based change events -- you'd have to\n    poll getFile() on an interval, which is laggy and burns cycles for\n    something that wants to feel instant.\n  - A real live-watch wants a small local process (chokidar / fs.watch)\n    pushing change events over a socket to the page -- same shape as\n    vite/devProxy.ts (apply: \"serve\", dev-only, never ships to\n    protoarch.web.app). Meaning: this feature, however it's built, almost\n    certainly only works while running the dev server locally, not on the\n    deployed site. Confirm that's an acceptable shape before building\n    toward it.\n  - The two-way version is the actually hard part: if JB is mid-drag on the\n    canvas the instant an agent writes the file, something has to decide\n    what wins. That's the same class of problem as Figma/Google Docs\n    collaborative editing between two live editors -- it does not have an\n    obvious cheap answer, and guessing at one before it's designed is how\n    you end up silently eating someone's edit.\n\nRecommended first cut, to get something real without solving the hard\nproblem: ONE-WAY sync only -- agent/file changes push into the dashboard\nlive (read-only reflect), JB's own edits still go through the existing\nsave/write-back path (FML-22). This sidesteps the conflict question\nentirely for v1 and is still a large, real capability (JB watches an agent\nwork, without refreshing). Two-way \"cowork\" stays a v2 decision, made once\nthe one-way version has been lived with.\n\nNon-goal for this ticket: implementing anything. This is a design pass --\nleaves with a decided architecture (confirm/replace the local-watcher-only\nassumption above) and a scoped v1 (one-way reflect), handed off as a new,\nconcretely-scoped ticket once that's settled.",
+      "context": [
+        "vite/devProxy.ts",
+        "lore/CONTEXT.md"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P3",
+      "tags": [
+        "design",
+        "sync",
+        "exploratory"
+      ],
+      "source": "JB",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T07:30:06.621149+00:00",
+          "event": "created",
+          "detail": "FML-23"
+        }
+      ]
     }
   ],
-  "counter": 20
+  "counter": 24
 }
