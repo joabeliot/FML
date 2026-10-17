@@ -738,7 +738,8 @@
       "context": [
         "ideas/flock-audit-lore-fml.md",
         "ideas/agentic-dev.md",
-        "ideas/flow-execution.md"
+        "ideas/flow-execution.md",
+        "ideas/ui-steps.md"
       ],
       "plan": null,
       "status": "backlog",
@@ -757,6 +758,11 @@
           "at": "2026-10-13T08:47:55.924339+00:00",
           "event": "created",
           "detail": "FML-19"
+        },
+        {
+          "at": "2026-10-17T09:31:44.482820+00:00",
+          "event": "context_added",
+          "detail": "ideas/ui-steps.md"
         }
       ]
     },
@@ -896,7 +902,7 @@
         "lore/CONTEXT.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P3",
       "tags": [
         "design",
@@ -905,17 +911,61 @@
       ],
       "source": "JB",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T07:30:06.621149+00:00",
           "event": "created",
           "detail": "FML-23"
+        },
+        {
+          "at": "2026-10-17T09:31:44.472169+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:31:44.475893+00:00",
+          "event": "log",
+          "detail": "Design delivered: lore/ideas/live-sync.md. Recommends option A — a dev-only Vite plugin using Vite's own watcher + HMR socket (no new deps); v1 one-way disk->dashboard with live files read-only; v2 two-way via optimistic concurrency (baseHash). Implementation filed as FML-24, pending sign-off on 3 open questions."
+        },
+        {
+          "at": "2026-10-17T09:31:44.479351+00:00",
+          "event": "completed",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "id": "FML-24",
+      "name": "Live sync v1: watched files stream into the dev dashboard (read-only)",
+      "description": "From the FML-23 design (lore/ideas/live-sync.md, option A). FML_WATCH=<dir> npm run dev: a vite/fileSync.ts plugin (apply: serve, never ships) adds the dir to Vite's own watcher and pushes *.fml / *.rml changes over Vite's HMR socket (fml:list, fml:file, fml:gone); the page listens with import.meta.hot.on. Watched files join the workspace marked live and are READ-ONLY in the dashboard in v1 (one-way sync would otherwise silently overwrite dashboard edits). Re-parse keeps the selection when its id survives. No new dependencies. Blocked on sign-off of the design's three open questions (dev-only OK? read-only OK? one dir or many?).",
+      "context": [
+        "ideas/live-sync.md",
+        "../vite/devProxy.ts"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "editor",
+        "dev-server",
+        "live-sync"
+      ],
+      "source": "Claude",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T09:31:36.591679+00:00",
+          "event": "created",
+          "detail": "FML-24"
         }
       ]
     }
   ],
-  "counter": 24
+  "counter": 25
 }

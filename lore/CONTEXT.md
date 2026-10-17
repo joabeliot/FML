@@ -1,13 +1,53 @@
 # Context — F*ML
 
-**Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre)
-**Phase:** R&D → the north star is real. **Flows execute and now check correctness**: `src/fml/run.ts` sends `api` nodes, threads `capture`d values, asserts `expect` *and* `assert.<path>` body/header/byte checks (`src/fml/assert.ts`), routes on status. CLI emits a machine-readable report (`--json`/`--report`, `src/fml/report.ts`) with value-based secret redaction, and loads secrets from a gitignored `.fml.env`. Run UI shipped; multi-host `base` merged to `main`; portal bubbles shipped. Live at https://protoarch.web.app / https://fml.arque.app
-**Open:** branch `feature/assertions-and-runner` (FML-11/12/13/14/15/17) awaiting JB review; `feature/structural-editing` (FML-22) is stacked on it — merge after; decrypt-then-hash for Flock media (FML-13 follow-up); routing on a captured/asserted value (not status) still unbuilt; the browser runner has no secrets-file equivalent (CLI only); a `matches` pattern can't contain `#` (comment lexer); api-node *authoring* UI not started; run targets the active doc only — a `flow` portal isn't stepped into; deployed site reaches CORS-permissive APIs only by design; breadcrumb for portal drill-down; "Open folder"; sidebar resize; label crowding; `public/index.html` dead boilerplate; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque, not FML
-**Next:** JB reviews both branches (assertions first, structural editing stacked on it), then merge + deploy (paired with a push to `main`); then FML-16 (staging gate, needs Flock access) or FML-20 (node sockets, builds on FML-22's write-back)
+**Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre) — and now RML (`.rml` roadmaps, `src/rml/`) on the same grammar
+**Phase:** R&D → the north star is real. Flows execute and check correctness (`assert.*`, bytes, ETag), emit a JSON report with redaction, load secrets from `.fml.env`, and can be checked against an OpenAPI spec (`npm run drift`). The dashboard edits structure (add/delete/rename/connect), shows data wires (capture → `{name}`), and has a Roadmap view for `.rml`. Assertions + structural editing merged to `main` 2026-10-17. Live at https://protoarch.web.app / https://fml.arque.app (not redeployed since the merges)
+**Open:** three stacked branches awaiting JB review, merge in order — `feature/openapi-drift` (FML-18) → `feature/node-sockets` (FML-20) → `feature/rml` (FML-21) → `feature/design-live-sync-ui-steps` (designs + FML-24); FML-16 blocked on Flock repo + staging access; FML-19 (UI steps) design in `ideas/ui-steps.md` awaiting sign-off; FML-24 (live sync v1) awaiting sign-off on `ideas/live-sync.md`'s open questions; lore CLI bug: `lore edit project --shorthand X` on a session with an empty shorthand re-prefixes every ticket id (`FML-1` → `FMLFML-1`) — reverted here with git, worth fixing in joabeliot/lore; decrypt-then-hash (FML-13 follow-up); routing on a captured/asserted value; `#` in values (comment lexer — now also bites CSS selectors for FML-19); no redeploy since the merges; `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque
+**Next:** JB reviews the stacked branches in order; then deploy (paired with a push to `main`); sign-off on the FML-19 and FML-24 designs; FML-16 once Flock access exists
 
 ---
 
 ## Log
+
+### 2026-10-17 (cont.) — Joab / Claude — Drift, data wires, RML, two designs
+Joab: "lets get building rest of the tickets". Both earlier branches had been
+merged to main by JB unchanged. Four new branches, stacked (merge in order):
+
+- **FML-18 drift** (`feature/openapi-drift`): `src/fml/drift.ts` + `npm run
+  drift -- <file.fml> <spec.json|yaml>`. Errors: unknown path / method;
+  warnings: undocumented statuses; coverage of unexercised operations;
+  multi-host nodes on another host skipped. `yaml` added as a devDependency
+  for the script only. Against httpbin's real spec it flags the 304/206/416
+  our own examples rely on.
+- **FML-20 node sockets** (`feature/node-sockets`): data wires as a second
+  canvas layer. Decided the ticket's three questions — same canvas, dashed
+  orange, Data toggle (selected node's wires always); drop on a card →
+  pick a field to append `{name}` to (or auth/query/new key); one port per
+  name. `src/lib/dataWires.ts`.
+- **FML-21 RML** (`feature/rml`): parser vocabulary made pluggable
+  (`ParseOptions.vocabulary`, FML default unchanged); `src/rml/rml.ts`;
+  Roadmap view (tech-tree tiles, done/active/READY/locked, gold paths,
+  status write-back, fml links). Decided: three written states + derived
+  ready; plain-text ticket links in v1. `examples/roadmap.rml` is F*ML's own
+  roadmap with real statuses.
+- **FML-23 / FML-19 designs** (`feature/design-live-sync-ui-steps`):
+  `ideas/live-sync.md` (recommend a dev-only Vite plugin on Vite's own
+  watcher + HMR socket; v1 one-way, live files read-only) → FML-23 closed,
+  v1 filed as FML-24. `ideas/ui-steps.md` (a `ui` node type with an injected
+  `UiDriver`, Playwright optional in the CLI) → FML-19 stays open for
+  sign-off.
+- FML-16 not started: needs the flockApi repo and Flock staging access.
+
+Tests: 11 suites green (new: drift, dataWires, rml), build clean; every UI
+piece driven in a headless browser. Found + fixed: roadmap and flow views
+sharing one React Flow store (a frame of wrong node types on every switch).
+Found, not fixed (it's the lore tool): `lore edit project --shorthand` on an
+empty-shorthand session re-prefixes every ticket id — the earlier attach
+had left this session's shorthand empty, which also made `lore ticket add`
+mint `-24`. Both reverted with git before anything was committed.
+Loaded: CLAUDE.md, lore/CONTEXT.md, lore/ideas/flock-audit-lore-fml.md, the
+FML-20/21 reference images
+Left open: JB review of 4 branches; sign-offs on FML-19 / FML-24; FML-16.
 
 ### 2026-10-17 (cont.) — Joab / Claude — Structural editing (FML-22)
 Branch `feature/structural-editing`, stacked on `feature/assertions-and-runner`.
