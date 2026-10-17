@@ -1028,7 +1028,7 @@
         "../src/components/RunInputs.tsx"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -1037,14 +1037,24 @@
       ],
       "source": "Joab",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T10:16:01.487580+00:00",
           "event": "created",
           "detail": "FML-26"
+        },
+        {
+          "at": "2026-10-17T11:03:17.163708+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T11:03:32.066588+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
