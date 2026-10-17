@@ -15,6 +15,7 @@
 | Run report | `src/fml/report.test.ts` | unit, fake transport | report shape, failure classification, value-based redaction, body truncation, `.fml.env` parsing |
 | Spec drift | `src/fml/drift.test.ts` | unit | path/method matching (params, base prefixes, literal-beats-template), status coverage rules, multi-host skip, multi-doc, junk spec |
 | Write-back | `src/lib/fmlEdit.test.ts` | unit | targeted text surgery survives comments/formatting, incl. flow lines with a trailing `# comment` |
+| Data wires | `src/lib/dataWires.test.ts` | unit | ports from captures/`{name}`s, one port per name, wires, @vars/input sources, visibility (on/off/selected), drop options |
 | Structural edits | `src/lib/fmlStructure.test.ts` | unit + example sweep | add/delete/rename node, add/delete edge, doc-local, no-ops; deletes and renames every node in every example (90) and re-parses |
 
 Live checks (network, not in `npm test`): `node scripts/run.ts` on
@@ -24,7 +25,7 @@ Live checks (network, not in `npm test`): `node scripts/run.ts` on
 
 ## Not Covered
 
-- React components and hooks (canvas, property panel, run bar) — structural editing UI was checked by hand in a headless browser (add, rename, drag-connect, label, ⌫, panel Delete, ⌘Z)
+- React components and hooks (canvas, property panel, run bar) — structural editing UI was checked by hand in a headless browser (add, rename, drag-connect, label, ⌫, panel Delete, ⌘Z; data wires: render, drag-drop picker, write-back, selection-only mode)
 - `scripts/run.ts` CLI flag handling (exercised by hand only; type-checked by `tsc -b`)
 - Browser transports (`src/lib/httpTransport.ts`) — the dev proxy was checked by hand
 

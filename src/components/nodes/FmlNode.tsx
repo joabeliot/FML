@@ -1,6 +1,7 @@
-import { Fragment } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Fragment, useEffect } from "react";
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
 import type { FmlFlowNode } from "../../types/chart.ts";
+import { inHandle, outHandle, type NodePorts } from "../../lib/dataWires.ts";
 import { UNTYPED } from "../../fml/index.ts";
 import { kindColor, kindTag, TRACE_IN, TRACE_OUT } from "../../lib/nodeStyle.ts";
 import { Glyph } from "../Glyph.tsx";
@@ -25,7 +26,14 @@ const RENDERABLE_IMAGE = /^(https?:|data:image\/)/i;
  * border so an undeclared reference is visible at a glance.
  */
 export function FmlNode({ id, data, selected }: NodeProps<FmlFlowNode>) {
-  const { label, kind, meta, dir, order, traceRole, onBadge, expanded, onExpand, runState } = data;
+  const { label, kind, meta, dir, order, traceRole, onBadge, expanded, onExpand, runState, ports } = data;
+
+  // Data ports come and go (Data toggle, selection). React Flow only learns
+  // about handles added after measuring when told — without this, a wire to
+  // a freshly shown port has nowhere to attach.
+  const updateNodeInternals = useUpdateNodeInternals();
+  const portKey = ports ? `${ports.inputs.map((p) => p.name).join(",")}|${ports.outputs.join(",")}` : "";
+  useEffect(() => updateNodeInternals(id), [id, portKey, updateNodeInternals]);
   const lr = dir === "LR";
   const primaryTarget = lr ? "left" : "top";
   const primarySource = lr ? "right" : "bottom";
@@ -75,6 +83,8 @@ export function FmlNode({ id, data, selected }: NodeProps<FmlFlowNode>) {
           />
         </Fragment>
       ))}
+
+      {ports && <DataPorts ports={ports} />}
 
       {/* the "there is another doc behind this" silhouette */}
       {portal && (
@@ -215,5 +225,68 @@ export function FmlNode({ id, data, selected }: NodeProps<FmlFlowNode>) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Vertical spot for port `i` of `n` along a side, as a CSS top. */
+const portTop = (i: number, n: number): string => `${((i + 1) / (n + 1)) * 100}%`;
+
+const PORT_TITLE: Record<string, string> = {
+  capture: "captured by an earlier node",
+  vars: "an @vars default — set in the file",
+  input: "a run-time input — nothing in the file supplies it",
+};
+
+/**
+ * Data sockets (FML-20): inputs down the left edge — one per `{name}` the
+ * node spends — and outputs down the right — one per `capture.<name>`. They
+ * sit on the sides because control flow owns top and bottom, and they're
+ * dashed-wire orange so the two kinds of connection never read as one.
+ * Drag from an output onto another node to use the value there.
+ */
+function DataPorts({ ports }: { ports: NodePorts }) {
+  const dot = "!h-2 !w-2 !min-h-0 !min-w-0 !border-[1.5px]";
+  return (
+    <>
+      {ports.inputs.map((p, i) => (
+        <Handle
+          key={`in-${p.name}`}
+          id={inHandle(p.name)}
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className={dot}
+          style={{
+            top: portTop(i, ports.inputs.length),
+            borderColor: p.source === "input" ? "var(--color-danger)" : "var(--color-data)",
+            background: p.source === "capture" ? "var(--color-data)" : "var(--color-bg)",
+          }}
+          title={`{${p.name}} — ${PORT_TITLE[p.source]}${p.from ? ` (${p.from})` : ""}`}
+        >
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[9.5px] text-[var(--color-data)]">
+            {p.name}
+          </span>
+        </Handle>
+      ))}
+      {ports.outputs.map((name, i) => (
+        <Handle
+          key={`out-${name}`}
+          id={outHandle(name)}
+          type="source"
+          position={Position.Right}
+          className={`${dot} cursor-crosshair`}
+          style={{
+            top: portTop(i, ports.outputs.length),
+            borderColor: "var(--color-data)",
+            background: "var(--color-data)",
+          }}
+          title={`capture.${name} — drag onto another node to use {${name}} there`}
+        >
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[9.5px] text-[var(--color-data)]">
+            {name}
+          </span>
+        </Handle>
+      ))}
+    </>
   );
 }

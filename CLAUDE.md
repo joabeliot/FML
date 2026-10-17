@@ -40,6 +40,7 @@ into the source file.
 | `src/lib/httpTransport.ts` | The browser's transport. Dev routes through `vite/devProxy.ts`; the built site calls `fetch` directly and therefore only reaches CORS-permissive APIs. |
 | `vite/devProxy.ts` | Dev-server request forwarder. `apply: "serve"` — it never ships, so the deployed site stays backend-free. |
 | `src/lib/fmlStructure.ts` | Structural edits — add/delete/rename a node, add/delete an edge — as surgical text splices, same rule as `fmlEdit.ts`. See `lore/features/structural-editing.md`. |
+| `src/lib/dataWires.ts` | Data wires (FML-20): capture → `{name}` ports and wires read from a doc, plus where a dropped wire can go. Read-only over the language — see `lore/features/node-sockets.md`. |
 | `src/lib/fmlEdit.ts` | Write-back: targeted text surgery into one `@doc`'s span. Never re-serialises the whole file — comments and formatting must survive. |
 | `src/lib/` | layout (dagre), toReactFlow, node styling |
 | `src/hooks/useForceLayout.ts` | Repulsion physics layered on dagre's rank layout (nodes never overlap, react live while dragging). Dagre still owns structure — rank, back-edge routing, badge order; this only refines pixel position in `FlowCanvas`. |
@@ -48,10 +49,10 @@ into the source file.
 
 ## Working rules
 
-- **Run `npm test` and `npm run build` before saying anything works.** Nine
+- **Run `npm test` and `npm run build` before saying anything works.** Ten
   suites: `src/fml/parse.test.ts`, `stats.test.ts`, `variables.test.ts`,
   `run.test.ts`, `lint.test.ts`, `report.test.ts`, `drift.test.ts`, `src/lib/fmlEdit.test.ts`,
-  `src/lib/fmlStructure.test.ts`.
+  `src/lib/fmlStructure.test.ts`, `src/lib/dataWires.test.ts`.
 - **`npm run demo -- <file>` is the structural check** when you can't see the canvas.
 - **Language changes ripple.** A new node type or key touches the parser, the
   renderer, the property panel, `HOW-TO.md` and the examples. Do all of them.

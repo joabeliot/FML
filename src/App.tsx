@@ -24,6 +24,8 @@ import {
 import { addEdge, addNode, deleteEdge, deleteNode, renameNode, uniqueNodeId } from "./lib/fmlStructure.ts";
 import { expandPortal, type BubbleGraph } from "./lib/expandPortal.ts";
 import { docPositionKey, renamePosition } from "./lib/nodePositions.ts";
+import { dataGraph, inHandle, outHandle, visibleDataGraph, wireOptions } from "./lib/dataWires.ts";
+import { DataWirePicker } from "./components/DataWirePicker.tsx";
 import { nodeSize } from "./lib/layout.ts";
 import type { FmlFlowNode } from "./types/chart.ts";
 import { fileKey, type Workspace } from "./types/workspace.ts";
@@ -75,6 +77,21 @@ export function App() {
 
   // Layout is always top-down; strict validation stays off (loose mode).
   const chart = useFmlChart(ws, activeDoc, "TB", false);
+
+  // Data wires (FML-20): every capture → {name} link in the active doc. All
+  // of them with the Data toggle on; otherwise just the selected node's.
+  const [dataOn, setDataOn] = useLocalStorage("protoarque_fml_datawires", false);
+  const fullData = useMemo(() => dataGraph(chart.doc), [chart.doc]);
+  const shownData = useMemo(
+    () => visibleDataGraph(fullData, dataOn, sel?.kind === "node" ? sel.id : null),
+    [fullData, dataOn, sel],
+  );
+  const [pendingWire, setPendingWire] = useState<{
+    source: string;
+    name: string;
+    target: string;
+    at: { x: number; y: number };
+  } | null>(null);
 
   // A trace id / expanded bubble is doc-local; drop both whenever the doc or file changes.
   useEffect(() => {
@@ -186,7 +203,13 @@ export function App() {
       // stray one-time fit-all (see FlowCanvas) land at an arbitrary moment
       // mid-run instead of only at genuine load — the actual cause of the
       // camera appearing to randomly zoom out during a run.
-      if (cached && cached.data.runState === state && cached.data.expanded === wantExpanded) {
+      const ports = shownData.ports.get(n.id);
+      if (
+        cached &&
+        cached.data.runState === state &&
+        cached.data.expanded === wantExpanded &&
+        cached.data.ports === ports
+      ) {
         nextCache.set(n.id, cached);
         return cached;
       }
@@ -197,6 +220,7 @@ export function App() {
           ...n.data,
           ...(needsExpand ? { expanded: wantExpanded, onExpand: toggleExpand } : {}),
           ...(ran ? { runState: state } : {}),
+          ...(ports ? { ports } : {}),
         },
       };
       nextCache.set(n.id, built);
@@ -205,7 +229,7 @@ export function App() {
 
     nodeCacheRef.current.byId = nextCache;
     return [...withState, ...bubbles.flatMap((b) => b.nodes)];
-  }, [chart.nodes, expanded, toggleExpand, bubbles, run.status, run.nodeState, run.visited]);
+  }, [chart.nodes, expanded, toggleExpand, bubbles, run.status, run.nodeState, run.visited, shownData]);
 
   // Same reuse trick as canvasNodes — same reasoning: an edge that's neither
   // the active one nor was just taken shouldn't get a new object every tick.
@@ -238,6 +262,24 @@ export function App() {
     edgeCacheRef.current.byId = nextCache;
     return [...own, ...bubbles.flatMap((b) => b.edges)];
   }, [chart.edges, bubbles, run.status, run.activeEdge, run.takenEdges]);
+
+  // Data wires ride on top of the control-flow graph. Kept out of layout and
+  // out of the fit key — showing them must never move a node or the camera.
+  const dataEdges = useMemo<Edge[]>(
+    () =>
+      shownData.wires.map((w) => ({
+        id: w.id,
+        source: w.source,
+        target: w.target,
+        sourceHandle: outHandle(w.name),
+        targetHandle: inHandle(w.name),
+        type: "data",
+        selectable: false,
+        focusable: false,
+      })),
+    [shownData],
+  );
+  const allEdges = useMemo(() => [...canvasEdges, ...dataEdges], [canvasEdges, dataEdges]);
 
   // A selection may be a bubble child — resolve it back to the doc + raw id
   // it actually represents, so edits land in the right file.
@@ -429,6 +471,25 @@ export function App() {
     [selResolved, structural, ws.entry],
   );
 
+  // Dropping a data wire: put `{name}` into the field the person picks.
+  const pickWire = useCallback(
+    (key: string, value: string) => {
+      if (!pendingWire) return;
+      const { target, name } = pendingWire;
+      const node = chart.doc.nodes.find((n) => n.id === target);
+      setPendingWire(null);
+      if (!node) return;
+      const ref = `{${name}}`;
+      // A typed key that already exists gets the reference appended, never replaced.
+      const prev = node.data[key]?.trim();
+      const next = value === ref && prev && !prev.includes(ref) ? `${prev} ${ref}` : value;
+      if (structural(chart.doc, (text, docName) => setNodeBlock(text, docName, target, { ...node.data, [key]: next }))) {
+        setSel({ kind: "node", id: target });
+      }
+    },
+    [pendingWire, chart.doc, structural],
+  );
+
   // Literal FML for the selected node — shown in the property panel's Code tab.
   const selNodeCode = useMemo(() => {
     if (sel?.kind !== "node" || !selResolved) return "";
@@ -531,7 +592,7 @@ export function App() {
         <div className="relative flex-1" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
           <FlowCanvas
             chartNodes={canvasNodes}
-            chartEdges={canvasEdges}
+            chartEdges={allEdges}
             selection={sel}
             onSelect={setSel}
             onOpenDoc={openDoc}
@@ -543,6 +604,11 @@ export function App() {
             runActive={run.status !== "idle"}
             padding={padding}
             onConnect={run.status === "running" ? undefined : connect}
+            onDataDrop={(source, name, target, at) => {
+              // Bubble children belong to another doc.
+              if (target.includes("::")) return;
+              setPendingWire({ source, name, target, at });
+            }}
           />
           <Toolbar
             sourceOpen={sourceOpen}
@@ -559,6 +625,8 @@ export function App() {
             onRun={startRun}
             onStop={run.stop}
             onAddNode={createNode}
+            dataOn={dataOn}
+            onToggleData={() => setDataOn((v) => !v)}
           />
 
           {sel && selResolved && (
@@ -604,6 +672,22 @@ export function App() {
               onClose={run.clear}
             />
           )}
+
+          {pendingWire &&
+            (() => {
+              const node = chart.doc.nodes.find((n) => n.id === pendingWire.target);
+              if (!node) return null;
+              return (
+                <DataWirePicker
+                  name={pendingWire.name}
+                  target={pendingWire.target}
+                  at={pendingWire.at}
+                  options={wireOptions(node.data, node.type, pendingWire.name)}
+                  onPick={pickWire}
+                  onClose={() => setPendingWire(null)}
+                />
+              );
+            })()}
 
           {askingInputs && (
             <RunInputs

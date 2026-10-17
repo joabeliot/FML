@@ -1,4 +1,5 @@
 import type { Node } from "@xyflow/react";
+import type { NodePorts } from "../lib/dataWires.ts";
 
 export type LayoutDirection = "TB" | "LR";
 
@@ -23,6 +24,8 @@ export interface FmlNodeData {
   expanded?: boolean;
   /** Toggle inline expansion for a `flow` node — wired in by App, called from the expand button. */
   onExpand?: (id: string) => void;
+  /** Data sockets to draw (FML-20) — absent when this node shows none right now. */
+  ports?: NodePorts;
   /** React Flow requires node data to be an index signature. */
   [key: string]: unknown;
 }

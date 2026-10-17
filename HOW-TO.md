@@ -974,6 +974,19 @@ What the viewer gives you beyond the picture:
     node also removes its `@node` block, every arrow into or out of it, and
     any group it leaves empty, so nothing is left dangling.
   - **⌘Z / Ctrl+Z** undoes the last of these edits.
+- **See where values flow (data wires).** Each `capture.<name>` is an output
+  port on the right of its card, and each `{name}` a node uses is an input
+  port on the left. A dashed orange wire joins the node that captures a value
+  to every node that uses it. Selecting a node shows its wires; the **Data**
+  toolbar button shows them all. Input ports also show where the value comes
+  from:
+  - **filled:** captured by a node
+  - **hollow:** an `@vars` default
+  - **hollow red:** a run-time input you'll be asked for
+- **Wire a value by dragging.** Drag from an output port and drop it anywhere
+  on another card. Then pick where `{name}` should go: appended to one of the
+  card's fields, `auth: bearer {name}`, `query.<name>`, or a new key you type.
+  It's the same text you'd have typed yourself. ⌘Z undoes it.
 - **Double-click a `flow` node** to drill into the doc its `doc:` key names.
 - **Click a step badge** (top-right of a card) to spotlight that node's
   immediate `prev` / `next` neighbours and dim the rest.

@@ -24,6 +24,8 @@
 
   --color-danger: #f2777a;
   --color-warn: #e8b055;
+  /* Data wires (FML-20) — what value goes where, distinct from control flow. */
+  --color-data: #ee8a4f;
 
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
   --font-brand: "Lexend", ui-sans-serif, system-ui, sans-serif;

@@ -22,6 +22,9 @@ interface Props {
   onStop: () => void;
   /** Declare a new node of this type in the active doc. */
   onAddNode: (type: string) => void;
+  /** Data wires (capture → {name}) drawn for every node, not just the selected one. */
+  dataOn: boolean;
+  onToggleData: () => void;
 }
 
 const btn =
@@ -189,6 +192,13 @@ export function Toolbar(props: Props) {
 
       <button className={`${btn} ${props.sourceOpen ? on : idle}`} onClick={props.onToggleSource}>
         Source
+      </button>
+      <button
+        className={`${btn} ${props.dataOn ? on : idle}`}
+        onClick={props.onToggleData}
+        title="Show every data wire — which captured value feeds which node. Off: only the selected node's."
+      >
+        Data
       </button>
 
       {issueCount > 0 && (
