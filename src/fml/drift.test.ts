@@ -188,6 +188,16 @@ const OAS3 = {
   eq("findings carry their doc", r.findings.map((f) => `${f.doc}/${f.nodeId}`), ["one/a", "two/b"]);
 }
 
+// 7b. a base written as a variable is an origin, not a path segment
+{
+  const r = checkDrift(docs(`@meta\n  base: {apiBase}/v1\n@nodes\n  a = api\n@node a {\n  path: /health\n}\n`), OAS3);
+  eq("{apiBase}/v1 matches the spec's /v1 server", r.findings, []);
+  const bare = checkDrift(docs(`@meta\n  base: {apiBase}\n@nodes\n  a = api\n@node a {\n  path: /login\n  method: POST\n}\n`), {
+    paths: { "/login": { post: { responses: { "200": {} } } } },
+  });
+  eq("a bare {apiBase} contributes no segment", bare.findings, []);
+}
+
 // 8. garbage in, empty report out — never a throw ----------------------------
 {
   const r = checkDrift(docs(`@nodes\n  a = api\n@node a {\n  url: https://x.test/a\n}\n`), "not a spec");
