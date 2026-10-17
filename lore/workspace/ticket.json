@@ -817,7 +817,7 @@
         "lore/CONTEXT.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "inprogress",
       "priority": "P1",
       "tags": [
         "ui",
@@ -826,14 +826,24 @@
       ],
       "source": "JB",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
       "completed_at": null,
       "logs": [
         {
           "at": "2026-10-17T07:29:52.264907+00:00",
           "event": "created",
           "detail": "FML-22"
+        },
+        {
+          "at": "2026-10-17T08:06:12.348821+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T08:06:12.352175+00:00",
+          "event": "started",
+          "detail": "claude"
         }
       ]
     },

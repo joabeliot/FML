@@ -35,6 +35,10 @@ interface Props {
   onCommitNodeCode: (id: string, text: string) => void;
   /** This node's result in the last run, when there was one. */
   runStep?: StepResult;
+  /** Rename the selected node everywhere in its doc; false when the id is taken or invalid. */
+  onRenameNode: (from: string, to: string) => boolean;
+  /** Delete the selection from the source. Absent while a run is in flight. */
+  onDelete?: () => void;
 }
 
 type Row = [string, string];
@@ -58,6 +62,8 @@ export function PropertyPanel({
   nodeCode,
   onCommitNodeCode,
   runStep,
+  onRenameNode,
+  onDelete,
 }: Props) {
   const node = sel.kind === "node" ? doc.nodes.find((n) => n.id === sel.id) : undefined;
   const edge = sel.kind === "edge" ? doc.edges.find((e) => e.id === sel.id) : undefined;
@@ -101,6 +107,19 @@ export function PropertyPanel({
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">
           {node ? (node.data.label || node.id) : edge ? `${edge.source} → ${edge.target}` : sel.id}
         </span>
+        {onDelete && (node || edge) && (
+          <button
+            className="rounded px-1.5 py-0.5 text-[10.5px] font-medium text-ink-mute transition-colors hover:bg-danger/15 hover:text-danger"
+            onClick={onDelete}
+            title={
+              node
+                ? "Delete this node, its block and every edge touching it (⌫ · undo ⌘Z)"
+                : "Delete this edge (⌫ · undo ⌘Z)"
+            }
+          >
+            Delete
+          </button>
+        )}
         <button
           className="rounded px-1.5 text-[13px] leading-none text-ink-mute transition-colors hover:bg-white/10 hover:text-ink"
           onClick={onClose}
@@ -129,7 +148,9 @@ export function PropertyPanel({
       )}
 
       <div className="flex-1 overflow-y-auto p-3">
-        {node && tab === "props" && <NodeForm key={sel.id} node={node} onCommit={onCommitNode} />}
+        {node && tab === "props" && (
+          <NodeForm key={sel.id} node={node} onCommit={onCommitNode} onRename={onRenameNode} />
+        )}
         {node && tab === "about" && (
           <AboutView node={node} inEdges={inEdges} outEdges={outEdges} varUsage={varUsage} />
         )}
@@ -382,9 +403,11 @@ function KeyValueRows({
 function NodeForm({
   node,
   onCommit,
+  onRename,
 }: {
   node: FmlNode;
   onCommit: (id: string, block: Record<string, string>, type: string) => void;
+  onRename: (from: string, to: string) => boolean;
 }) {
   const seed = (): Row[] => {
     const { label, ...meta } = node.data;
@@ -419,10 +442,7 @@ function NodeForm({
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <div className={keyLabel}>id</div>
-        <div className="mt-1 font-mono text-[12px] text-ink">{node.id}</div>
-      </div>
+      <IdField id={node.id} onRename={onRename} />
 
       <div>
         <div className={keyLabel}>type</div>
@@ -675,5 +695,56 @@ function Body({ text }: { text: string }) {
     <pre className="mt-1 max-h-[240px] overflow-auto rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[10.5px] leading-relaxed text-ink-dim">
       {shown || "(empty)"}
     </pre>
+  );
+}
+
+/**
+ * The node id, editable. Renaming rewrites every reference in the doc
+ * (declaration, block, flow lines), so it commits on Enter / blur rather than
+ * per keystroke, and an id that's invalid or taken just snaps back.
+ */
+function IdField({ id, onRename }: { id: string; onRename: (from: string, to: string) => boolean }) {
+  const [draft, setDraft] = useState(id);
+  const [rejected, setRejected] = useState(false);
+  useEffect(() => {
+    setDraft(id);
+    setRejected(false);
+  }, [id]);
+
+  const valid = /^[A-Za-z0-9_]+$/.test(draft);
+  const commit = () => {
+    if (draft === id) return;
+    if (valid && onRename(id, draft)) return;
+    setRejected(true);
+    setDraft(id);
+  };
+
+  return (
+    <div>
+      <div className={keyLabel}>id</div>
+      <input
+        className={`${field} mt-1 ${!valid || rejected ? "!border-danger/60" : ""}`}
+        value={draft}
+        spellCheck={false}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          setRejected(false);
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(id);
+            e.currentTarget.blur();
+          }
+        }}
+        title="Letters, digits and _ — renames every reference in this doc"
+      />
+      {(!valid || rejected) && (
+        <p className="mt-1 text-[10.5px] text-danger">
+          {!valid ? "letters, digits and _ only" : "that id is already used in this doc"}
+        </p>
+      )}
+    </div>
   );
 }

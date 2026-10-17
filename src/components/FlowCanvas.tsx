@@ -83,6 +83,11 @@ interface Props {
   runActive: boolean;
   /** Keeps `fitView` from tucking nodes under the toolbar or side panels. */
   padding: FitPadding;
+  /**
+   * Draw a new edge by dragging from one node's handle to another. Absent
+   * (mid-run) means connecting is off.
+   */
+  onConnect?: (source: string, target: string) => void;
 }
 
 export function FlowCanvas({
@@ -98,8 +103,9 @@ export function FlowCanvas({
   focus,
   runActive,
   padding,
+  onConnect,
 }: Props) {
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
   const initialized = useNodesInitialized();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FmlFlowNode>(chartNodes);
@@ -154,10 +160,21 @@ export function FlowCanvas({
       return;
     }
     if (!initialized || fitDoneFor.current === fitKey) return;
+    // `initialized` can still read true on the render where a node was just
+    // added — it describes the graph *before* the newcomer was measured, and
+    // fitView skips unmeasured nodes. Fitting then frames the old graph and
+    // the guard stops the real fit ever happening, leaving the new node off
+    // screen. Wait for every node to have a size; the hook flips false→true
+    // once it does, which re-runs this.
+    // The store is synced from `chartNodes` in an effect, so on the render
+    // the key changes it may not even hold the new node yet.
+    const inStore = getNodes();
+    const have = new Set(inStore.map((n) => n.id));
+    if (chartNodes.some((n) => !have.has(n.id)) || inStore.some((n) => !n.measured?.width)) return;
     fitDoneFor.current = fitKey;
     const id = requestAnimationFrame(() => void fitView({ padding: paddingRef.current, duration: 200 }));
     return () => cancelAnimationFrame(id);
-  }, [runActive, initialized, fitKey, fitView]);
+  }, [runActive, initialized, fitKey, fitView, getNodes, chartNodes]);
 
   // Follow the run: settle on the node being called, then pull out to frame
   // both ends of the edge a request is crossing. `maxZoom` is what stops a
@@ -324,7 +341,14 @@ export function FlowCanvas({
         // of the camera randomly zooming out. The effect above is the only
         // thing that does an initial fit now.
         nodesDraggable
-        nodesConnectable={false}
+        nodesConnectable={!!onConnect}
+        onConnect={(c) => {
+          if (c.source && c.target) onConnect?.(c.source, c.target);
+        }}
+        // Deleting goes through the .fml (App's key handler), never React
+        // Flow's local state — a node removed only on the canvas reappears on
+        // the next parse.
+        deleteKeyCode={null}
         edgesReconnectable={false}
         elementsSelectable
         minZoom={0.2}

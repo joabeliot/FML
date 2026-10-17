@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { ReactFlowProvider, type Edge } from "@xyflow/react";
-import type { FmlEdge } from "./fml/index.ts";
+import type { FmlDoc, FmlEdge } from "./fml/index.ts";
 import { FlowCanvas, fitPadding } from "./components/FlowCanvas.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
@@ -21,7 +21,9 @@ import {
   setNodeSource,
   setNodeType,
 } from "./lib/fmlEdit.ts";
+import { addEdge, addNode, deleteEdge, deleteNode, renameNode, uniqueNodeId } from "./lib/fmlStructure.ts";
 import { expandPortal, type BubbleGraph } from "./lib/expandPortal.ts";
+import { docPositionKey, renamePosition } from "./lib/nodePositions.ts";
 import { nodeSize } from "./lib/layout.ts";
 import type { FmlFlowNode } from "./types/chart.ts";
 import { fileKey, type Workspace } from "./types/workspace.ts";
@@ -341,6 +343,92 @@ export function App() {
     [editTarget, writeFile],
   );
 
+  // -- structural edits (FML-22) --------------------------------------------
+  // Add / delete / rename nodes, add / delete edges. Each is one surgical text
+  // edit (src/lib/fmlStructure.ts), so the source panel shows exactly what
+  // the canvas did. Every one is undoable with ⌘Z — a delete takes a node's
+  // metadata and edges with it, and the file is the only copy.
+
+  /** Which file + doc name an edit to `doc` lands in (an @fof doc is "main" in its own file). */
+  const targetOf = useCallback(
+    (doc: FmlDoc) => ({
+      file: doc.source ? fileKey(doc.source) : ws.entry,
+      docName: doc.source ? "main" : doc.name,
+    }),
+    [ws.entry],
+  );
+
+  const undoStack = useRef<Array<{ file: string; text: string }>>([]);
+
+  /** Apply one structural edit; false when it was a no-op (taken id, nothing there). */
+  const structural = useCallback(
+    (doc: FmlDoc, edit: (text: string, docName: string) => string): boolean => {
+      const { file, docName } = targetOf(doc);
+      const before = ws.files[file] ?? "";
+      const after = edit(before, docName);
+      if (after === before) return false;
+      undoStack.current = [...undoStack.current.slice(-49), { file, text: before }];
+      setWs((prev) => ({ ...prev, files: { ...prev.files, [file]: after } }));
+      return true;
+    },
+    [targetOf, ws.files, setWs],
+  );
+
+  const undo = useCallback(() => {
+    const last = undoStack.current.pop();
+    if (!last) return;
+    setWs((prev) => ({ ...prev, files: { ...prev.files, [last.file]: last.text } }));
+    setSel(null);
+  }, [setWs]);
+
+  const createNode = useCallback(
+    (type: string) => {
+      const doc = chart.doc;
+      const { file, docName } = targetOf(doc);
+      const id = uniqueNodeId(ws.files[file] ?? "", docName, type);
+      if (structural(doc, (text, name) => addNode(text, name, id, type))) setSel({ kind: "node", id });
+    },
+    [chart.doc, targetOf, ws.files, structural],
+  );
+
+  const connect = useCallback(
+    (source: string, target: string) => {
+      // Bubble children belong to another doc — an edge can't cross into one.
+      if (source.includes("::") || target.includes("::")) return;
+      const base = `edge_${source}_${target}`;
+      const existing = chart.doc.edges.filter((e) => e.source === source && e.target === target).length;
+      if (structural(chart.doc, (text, name) => addEdge(text, name, { source, target, label: "" }))) {
+        // Select it so the label can be typed straight away.
+        setSel({ kind: "edge", id: existing === 0 ? base : `${base}_${existing}` });
+      }
+    },
+    [chart.doc, structural],
+  );
+
+  const deleteSelected = useCallback(() => {
+    if (!sel || !selResolved) return;
+    const { doc, rawId } = selResolved;
+    if (sel.kind === "node") {
+      if (structural(doc, (text, name) => deleteNode(text, name, rawId))) setSel(null);
+      return;
+    }
+    const edge = doc.edges.find((e) => e.id === rawId);
+    if (edge && structural(doc, (text, name) => deleteEdge(text, name, edge))) setSel(null);
+  }, [sel, selResolved, structural]);
+
+  const renameSelected = useCallback(
+    (from: string, to: string): boolean => {
+      if (!selResolved) return false;
+      const { doc } = selResolved;
+      if (!structural(doc, (text, name) => renameNode(text, name, from, to))) return false;
+      renamePosition(docPositionKey(ws.entry, doc), from, to);
+      // A bubble child's selection id is namespaced — keep the prefix.
+      setSel((s) => (s ? { ...s, id: s.id === from ? to : s.id.replace(new RegExp(`::${from}$`), `::${to}`) } : s));
+      return true;
+    },
+    [selResolved, structural, ws.entry],
+  );
+
   // Literal FML for the selected node — shown in the property panel's Code tab.
   const selNodeCode = useMemo(() => {
     if (sel?.kind !== "node" || !selResolved) return "";
@@ -369,7 +457,8 @@ export function App() {
     [addFiles],
   );
 
-  // Esc clears the selection; ⌘\ / Ctrl+\ toggles the sidebar. Both are
+  // Esc clears the selection; ⌘\ / Ctrl+\ toggles the sidebar; Delete /
+  // Backspace removes the selection; ⌘Z undoes a structural edit. All are
   // ignored while a field has focus so they never fight with typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -379,6 +468,14 @@ export function App() {
         setSel(null);
         setTrace(null);
       }
+      if ((e.key === "Delete" || e.key === "Backspace") && !typing && run.status !== "running") {
+        e.preventDefault();
+        deleteSelected();
+      }
+      if (e.key === "z" && (e.metaKey || e.ctrlKey) && !e.shiftKey && !typing) {
+        e.preventDefault();
+        undo();
+      }
       if (e.key === "\\" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setSidebarOpen((v) => !v);
@@ -386,7 +483,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setSidebarOpen]);
+  }, [setSidebarOpen, deleteSelected, undo, run.status]);
 
   const fileNames = useMemo(() => Object.keys(ws.files), [ws.files]);
 
@@ -445,6 +542,7 @@ export function App() {
             focus={run.focus}
             runActive={run.status !== "idle"}
             padding={padding}
+            onConnect={run.status === "running" ? undefined : connect}
           />
           <Toolbar
             sourceOpen={sourceOpen}
@@ -460,6 +558,7 @@ export function App() {
             running={run.status === "running"}
             onRun={startRun}
             onStop={run.stop}
+            onAddNode={createNode}
           />
 
           {sel && selResolved && (
@@ -473,6 +572,8 @@ export function App() {
               onCommitEdgeNote={commitEdgeNote}
               nodeCode={selNodeCode}
               onCommitNodeCode={commitNodeCode}
+              onRenameNode={renameSelected}
+              onDelete={run.status === "running" ? undefined : deleteSelected}
               runStep={run.steps.find((st) => st.nodeId === selResolved.rawId)}
             />
           )}

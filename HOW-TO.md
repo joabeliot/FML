@@ -923,6 +923,23 @@ What the viewer gives you beyond the picture:
   came in through `@fof`. Comments and layout survive the edit.
 - The panel knows the standard: it lists the type's expected keys as one-click
   chips and explains what the type means.
+- **Build the diagram without typing FML.** Each of these is a small text edit
+  to the `.fml`. Nothing gets re-printed, so your comments and formatting
+  everywhere else stay as they were:
+  - **+ Node** (toolbar) → pick a type. It's declared at the end of `@nodes`
+    with a fresh id (`page1`, `api2`, …) and selected, ready to fill in.
+  - **Rename** by editing the **id** field (Enter or click away). Every
+    reference in the doc follows: the `@nodes` line, the `@node` block, and
+    every arrow. An edge label that contains the old id is left alone. An id
+    that's taken or invalid snaps back.
+  - **Connect** by dragging from a node's handle (the dot on its bottom edge)
+    onto another node. If the source already has a group in `@flow`, the arrow
+    joins that group. Otherwise it's a new line at the end of `@flow`. The new
+    arrow is selected so you can type its label.
+  - **Delete** with the panel's **Delete** button or ⌫ / Delete. Deleting a
+    node also removes its `@node` block, every arrow into or out of it, and
+    any group it leaves empty, so nothing is left dangling.
+  - **⌘Z / Ctrl+Z** undoes the last of these edits.
 - **Double-click a `flow` node** to drill into the doc its `doc:` key names.
 - **Click a step badge** (top-right of a card) to spotlight that node's
   immediate `prev` / `next` neighbours and dim the rest.
