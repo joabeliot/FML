@@ -70,23 +70,38 @@ const g = dataGraph(doc);
 
 // 2. wires -----------------------------------------------------------------
 {
-  eq("one wire per captured name per consumer", g.wires.map((w) => `${w.source}>${w.target}:${w.name}`), [
+  const captured = g.wires.filter((w) => !w.source.startsWith("var:"));
+  eq("one wire per captured name per consumer", captured.map((w) => `${w.source}>${w.target}:${w.name}`), [
     "login>getMe:userId",
     "login>getMe:token",
   ]);
   ok("a node spending its own capture draws no wire", !g.wires.some((w) => w.source === w.target));
-  ok("@vars and run-time inputs have ports but no wires", !g.wires.some((w) => w.name === "email" || w.name === "password"));
+}
+
+// 2b. variable nodes (FML-27) ------------------------------------------------
+{
+  eq("every @vars entry and run-time input is a variable", g.vars, [
+    { name: "email", source: "vars", value: "jb@arque.app" },
+    { name: "password", source: "input" },
+  ]);
+  eq("each wires to the node that spends it", g.wires.filter((w) => w.source.startsWith("var:")).map((w) => `${w.source}>${w.target}:${w.name}`), [
+    "var:email>login:email",
+    "var:password>login:password",
+  ]);
+  eq("a variable node has one output port", g.ports.get("var:email"), { inputs: [], outputs: ["email"] });
+  const unused = dataGraph(parse("@vars\n  spare: 1\n@nodes\n  a = page\n", { strict: false }).doc);
+  eq("an unused @vars entry is still a node, with no wires", [unused.vars.length, unused.wires.length], [1, 0]);
 }
 
 // 3. what's visible ---------------------------------------------------------
 {
   eq("Data on: everything", visibleDataGraph(g, true, null), g);
-  eq("off, nothing selected: nothing", visibleDataGraph(g, false, null).wires, []);
+  const none = visibleDataGraph(g, false, null);
+  eq("off, nothing selected: no wires", none.wires, []);
+  ok("but every port still shows, so there's something to connect to", none.ports === g.ports);
   const sel = visibleDataGraph(g, false, "getMe");
   eq("off, a node selected: its wires", sel.wires.length, 2);
-  eq("its own ports in full", sel.ports.get("getMe"), g.ports.get("getMe"));
-  eq("and only the far ends' ports those wires use", sel.ports.get("login"), { inputs: [], outputs: ["userId", "token"] });
-  eq("unrelated nodes show nothing", sel.ports.has("income"), false);
+  eq("selecting a variable shows its wires", visibleDataGraph(g, false, "var:password").wires.map((w) => w.target), ["login"]);
 }
 
 // 4. where a dropped wire can go ----------------------------------------------

@@ -20,11 +20,24 @@ import {
   setNodeBlock,
   setNodeSource,
   setNodeType,
+  renameVar,
+  setVar,
 } from "./lib/fmlEdit.ts";
 import { addEdge, addNode, deleteEdge, deleteNode, renameNode, uniqueNodeId } from "./lib/fmlStructure.ts";
 import { expandPortal, type BubbleGraph } from "./lib/expandPortal.ts";
-import { docPositionKey, renamePosition } from "./lib/nodePositions.ts";
-import { dataGraph, inHandle, outHandle, visibleDataGraph, wireOptions, type DataGraph } from "./lib/dataWires.ts";
+import { docPositionKey, getPositions, renamePosition } from "./lib/nodePositions.ts";
+import {
+  dataGraph,
+  inHandle,
+  isVarNodeId,
+  outHandle,
+  varNameOf,
+  varNodeId,
+  visibleDataGraph,
+  wireOptions,
+  type DataGraph,
+} from "./lib/dataWires.ts";
+import { VarPanel } from "./components/VarPanel.tsx";
 import { DataWirePicker } from "./components/DataWirePicker.tsx";
 import { RoadmapView } from "./components/RoadmapView.tsx";
 import ROADMAP_EXAMPLE from "../examples/roadmap.rml?raw";
@@ -252,6 +265,41 @@ export function App() {
     nodeCacheRef.current.byId = nextCache;
     return [...withState, ...bubbles.flatMap((b) => b.nodes)];
   }, [chart.nodes, expanded, toggleExpand, bubbles, run.status, run.nodeState, run.visited, shownData]);
+
+  // Variable nodes (FML-27): one per @vars entry / run-time input, in a column
+  // left of the flow, each level with the first node that spends it. Not in
+  // the .fml as nodes, so not in dagre — but a dragged one keeps its spot.
+  const varNodes = useMemo<FmlFlowNode[]>(() => {
+    const own = chart.nodes;
+    if (fullData.vars.length === 0) return [];
+    const minX = own.length ? Math.min(...own.map((n) => n.position.x)) : 0;
+    const saved = getPositions(chart.posDocKey);
+    const rows = fullData.vars.map((v) => {
+      const firstUser = fullData.wires.find((w) => w.source === varNodeId(v.name))?.target;
+      const y = own.find((n) => n.id === firstUser)?.position.y ?? Infinity;
+      return { v, y };
+    });
+    rows.sort((a, b) => a.y - b.y);
+    let floor = -Infinity;
+    return rows.map(({ v, y }) => {
+      const id = varNodeId(v.name);
+      const top = Math.max(Number.isFinite(y) ? y : floor + 48, floor + 48);
+      floor = top;
+      return {
+        id,
+        type: "var",
+        position: saved[id] ?? { x: minX - 280, y: Number.isFinite(top) ? top : 0 },
+        data: {
+          label: v.name,
+          kind: "var",
+          meta: { source: v.source, ...(v.value !== undefined ? { value: v.value } : {}) },
+          dir: "TB",
+          ports: shownData.ports.get(id),
+        },
+      };
+    });
+  }, [chart.nodes, chart.posDocKey, fullData, shownData]);
+  const graphNodes = useMemo(() => [...canvasNodes, ...varNodes], [canvasNodes, varNodes]);
 
   // Same reuse trick as canvasNodes — same reasoning: an edge that's neither
   // the active one nor was just taken shouldn't get a new object every tick.
@@ -483,6 +531,10 @@ export function App() {
 
   const deleteSelected = useCallback(() => {
     if (!sel || !selResolved) return;
+    if (isVarNodeId(sel.id)) {
+      if (structural(chart.doc, (text, name) => setVar(text, name, varNameOf(sel.id), null))) setSel(null);
+      return;
+    }
     const { doc, rawId } = selResolved;
     if (sel.kind === "node") {
       if (structural(doc, (text, name) => deleteNode(text, name, rawId))) setSel(null);
@@ -490,7 +542,7 @@ export function App() {
     }
     const edge = doc.edges.find((e) => e.id === rawId);
     if (edge && structural(doc, (text, name) => deleteEdge(text, name, edge))) setSel(null);
-  }, [sel, selResolved, structural]);
+  }, [sel, selResolved, structural, chart.doc]);
 
   const renameSelected = useCallback(
     (from: string, to: string): boolean => {
@@ -503,6 +555,26 @@ export function App() {
       return true;
     },
     [selResolved, structural, ws.entry],
+  );
+
+  const createVar = useCallback(() => {
+    const taken = new Set(fullData.vars.map((v) => v.name));
+    let n = 1;
+    while (taken.has(`var${n}`)) n++;
+    const name = `var${n}`;
+    if (structural(chart.doc, (text, docName) => setVar(text, docName, name, ""))) setSel({ kind: "node", id: varNodeId(name) });
+  }, [fullData, chart.doc, structural]);
+
+  // A wire dropped onto an input port: that `{port}` now reads `{name}`.
+  const repointInput = useCallback(
+    (target: string, port: string, name: string) => {
+      const node = chart.doc.nodes.find((n) => n.id === target);
+      if (!node || port === name) return;
+      const from = `{${port}}`;
+      const data = Object.fromEntries(Object.entries(node.data).map(([k, v]) => [k, v.split(from).join(`{${name}}`)]));
+      if (structural(chart.doc, (text, docName) => setNodeBlock(text, docName, target, data))) setSel({ kind: "node", id: target });
+    },
+    [chart.doc, structural],
   );
 
   // Dropping a data wire: put `{name}` into the field the person picks.
@@ -656,7 +728,7 @@ export function App() {
             />
           ) : (
             <FlowCanvas
-              chartNodes={canvasNodes}
+              chartNodes={graphNodes}
               chartEdges={allEdges}
               selection={sel}
               onSelect={setSel}
@@ -669,10 +741,11 @@ export function App() {
               runActive={run.status !== "idle"}
               padding={padding}
               onConnect={run.status === "running" ? undefined : connect}
-              onDataDrop={(source, name, target, at) => {
+              onDataDrop={(source, name, target, at, port) => {
                 // Bubble children belong to another doc.
                 if (target.includes("::")) return;
-                setPendingWire({ source, name, target, at });
+                if (port) repointInput(target, port, name);
+                else setPendingWire({ source, name, target, at });
               }}
             />
           )}
@@ -713,11 +786,35 @@ export function App() {
             onRun={startRun}
             onStop={run.stop}
             onAddNode={createNode}
+            onAddVar={createVar}
             dataOn={dataOn}
             onToggleData={() => setDataOn((v) => !v)}
           />
 
-          {view === "flows" && sel && selResolved && (
+          {view === "flows" && sel && isVarNodeId(sel.id) && (() => {
+            const v = fullData.vars.find((x) => x.name === varNameOf(sel.id));
+            if (!v) return null;
+            return (
+              <VarPanel
+                v={v}
+                usedBy={fullData.wires.filter((w) => w.source === sel.id).map((w) => w.target)}
+                shiftLeft={sourceOpen ? SOURCE_W : 0}
+                onClose={() => setSel(null)}
+                onRename={(to) => {
+                  if (fullData.vars.some((x) => x.name === to)) return false;
+                  if (!structural(chart.doc, (text, docName) => renameVar(text, docName, v.name, to))) return false;
+                  renamePosition(chart.posDocKey, sel.id, varNodeId(to));
+                  setSel({ kind: "node", id: varNodeId(to) });
+                  return true;
+                }}
+                onValue={(value) => structural(chart.doc, (text, docName) => setVar(text, docName, v.name, value))}
+                onDelete={deleteSelected}
+                onSelectNode={(id) => setSel({ kind: "node", id })}
+              />
+            );
+          })()}
+
+          {view === "flows" && sel && selResolved && !isVarNodeId(sel.id) && (
             <PropertyPanel
               sel={{ kind: sel.kind, id: selResolved.rawId }}
               doc={selResolved.doc}

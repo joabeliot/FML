@@ -182,6 +182,29 @@ const DATA_FLOW = `@meta
   getMe -200> income
 `;
 
+const VAR_FLOW = `@vars
+  email: a@b.c
+
+@nodes
+  login  = api
+  verify = api
+
+@node login {
+  method: POST
+  path: /login
+  body: {email}
+}
+
+@node verify {
+  method: POST
+  path: /verify
+  body: {otp}
+}
+
+@flow
+  login -200> verify
+`;
+
 const runFlow = (base: string) => `@meta
   base: ${base}
 
@@ -330,6 +353,38 @@ try {
     await settle(page);
     ok("dropping a wire on a card writes the reference", (await fileText(page, "t")).includes("auth: bearer {token}"));
     ok("…and the new wire is drawn", (await dashed()) === 3);
+    ok("no console errors", problems.length === 0, problems.join(" | "));
+  });
+
+  await scenario("variable nodes and always-on ports (FML-27)", async () => {
+    const { page, problems } = await open({ t: VAR_FLOW });
+    ok("input ports show with nothing selected", (await page.locator('.react-flow__handle[data-handleid^="d-in-"]').count()) === 2);
+    ok("an @vars entry is a node", await page.locator(node("var:email")).isVisible());
+    ok("so is a run-time input", await page.locator(node("var:otp")).isVisible());
+
+    await button(page, "+ Node").click();
+    await page.getByRole("button", { name: /Variable/ }).click();
+    await page.locator(node("var:var1")).waitFor();
+    ok("+ Node → Variable adds an @vars entry", /@vars\n\s+email: a@b\.c\n\s+var1:/.test(await fileText(page, "t")), await fileText(page, "t"));
+
+    await page.locator("label").filter({ hasText: /^name/ }).locator("input").fill("code");
+    await page.locator("label").filter({ hasText: /^name/ }).locator("input").press("Enter");
+    await page.locator(node("var:code")).waitFor();
+    await page.locator("label").filter({ hasText: /^value/ }).locator("input").fill("123456");
+    await page.locator("label").filter({ hasText: /^value/ }).locator("input").press("Enter");
+    await settle(page);
+    ok("the panel renames it and sets its value", (await fileText(page, "t")).includes("code: 123456"), await fileText(page, "t"));
+
+    await drag(page, handle("var:code", "d-out-code"), handle("verify", "d-in-otp"));
+    await settle(page);
+    const text = await fileText(page, "t");
+    ok("dropping its port on an input port repoints that reference", text.includes("body: {code}") && !text.includes("{otp}"), text);
+
+    await page.locator(node("var:email")).click();
+    await button(page, "Delete").click();
+    await settle(page);
+    ok("deleting a variable removes its @vars entry", !(await fileText(page, "t")).includes("email: a@b.c"));
+    ok("its reference stays, now asked at run", await page.locator(node("var:email")).isVisible());
     ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 

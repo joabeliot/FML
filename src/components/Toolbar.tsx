@@ -24,6 +24,8 @@ interface Props {
   onStop: () => void;
   /** Declare a new node of this type in the active doc. */
   onAddNode: (type: string) => void;
+  /** Add an `@vars` entry — a variable node on the canvas (FML-27). */
+  onAddVar: () => void;
   /** Data wires (capture → {name}) drawn for every node, not just the selected one. */
   dataOn: boolean;
   onToggleData: () => void;
@@ -180,6 +182,20 @@ export function Toolbar(props: Props) {
                     </span>
                   </button>
                 ))}
+                <div className="my-1 h-px bg-line" />
+                <button
+                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
+                  onClick={() => {
+                    setAddOpen(false);
+                    props.onAddVar();
+                  }}
+                >
+                  <span className="mt-[1px] font-mono text-[11px] leading-none text-[var(--color-data)]">{"{}"}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-[11.5px] font-medium text-ink">Variable</span>
+                    <span className="text-[10.5px] leading-snug text-ink-mute">An @vars value. Wire it into any node's {"{name}"}.</span>
+                  </span>
+                </button>
               </div>
             )}
           </div>

@@ -1105,8 +1105,9 @@ What the viewer gives you beyond the picture:
   - **⌘Z / Ctrl+Z** undoes the last of these edits.
 - **See where values flow (data wires).** Each `capture.<name>` is an output
   port on the right of its card, and each `{name}` a node uses is an input
-  port on the left. A dashed orange wire joins the node that captures a value
-  to every node that uses it. Selecting a node shows its wires; the **Data**
+  port on the left. Ports are always shown, so there's always something to
+  connect to. A dashed orange wire joins the node that captures a value to
+  every node that uses it. Selecting a node shows its wires; the **Data**
   toolbar button shows them all. Input ports also show where the value comes
   from:
   - **filled:** captured by a node
@@ -1116,6 +1117,17 @@ What the viewer gives you beyond the picture:
   on another card. Then pick where `{name}` should go: appended to one of the
   card's fields, `auth: bearer {name}`, `query.<name>`, or a new key you type.
   It's the same text you'd have typed yourself. ⌘Z undoes it.
+  Drop it **on an input port** instead and that reference is repointed:
+  dropping `{code}` on a node's `otp` port turns every `{otp}` in that node
+  into `{code}`.
+- **Variables are nodes.** Every `@vars` entry, and every value nothing in
+  the file supplies (a run-time input, drawn dashed red, "at run"), sits as a
+  small pill to the left of the flow with one output port. Wire it like any
+  other output. **+ Node → Variable** adds an `@vars` entry; select one to
+  rename it (every `{name}` in the doc follows), set its value (giving a
+  run-time input a value adds it to `@vars`), or delete it (its references
+  stay, and become run-time inputs). Variable nodes aren't nodes in the
+  `.fml`; they're a view of `@vars`.
 - **Double-click a `flow` node** to drill into the doc its `doc:` key names.
 - **Click a step badge** (top-right of a card) to spotlight that node's
   immediate `prev` / `next` neighbours and dim the rest.

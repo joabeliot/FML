@@ -2,11 +2,13 @@
 import { parse } from "../fml/index.ts";
 import {
   nodeSource,
+  renameVar,
   setEdgeLabel,
   setEdgeNote,
   setNodeBlock,
   setNodeSource,
   setNodeType,
+  setVar,
 } from "./fmlEdit.ts";
 
 let passed = 0;
@@ -255,6 +257,25 @@ const SINGLE = `# a comment
   const noted = setEdgeNote(src, "main", { source: "A", target: "B", label: "go" }, { note: "x" });
   ok("adds a note to a commented flow line", noted.includes("A -go> B {   # why we go\n    note: x\n  }"), noted);
   ok("which still parses as one edge with its note", parse(noted).doc.edges[0]?.data?.note === "x");
+}
+
+// 18. @vars (FML-27)
+{
+  const src = "@meta\n  title: t\n\n@vars\n  email: a@b.c   # who\n\n@nodes\n  a = api\n@node a {\n  body: {email} {pw}  # {email} stays\n}\n";
+  const changed = setVar(src, "main", "email", "x@y.z");
+  ok("changes a value in place", parse(changed).doc.vars.email === "x@y.z" && changed.includes("@meta\n  title: t"), changed);
+  const added = setVar(src, "main", "pw", "secret");
+  ok("adds an entry at the end of @vars", added.includes("  email: a@b.c   # who\n  pw: secret"), added);
+  const removed = setVar(src, "main", "email", null);
+  ok("removes an entry", !removed.includes("email: a@b.c") && parse(removed).ok, removed);
+  const fresh = setVar("@nodes\n  a = page\n", "main", "x", "1");
+  ok("opens @vars ahead of @nodes when there's none", fresh.startsWith("@vars\n  x: 1\n\n@nodes") && parse(fresh).doc.vars.x === "1", fresh);
+  ok("an empty value is allowed (filled in later)", parse(setVar(src, "main", "pw", "")).doc.vars.pw === "");
+  const renamed = renameVar(src, "main", "email", "user");
+  ok("rename moves the entry and every {ref}", renamed.includes("  user: a@b.c") && renamed.includes("body: {user} {pw}"), renamed);
+  ok("but not inside a comment", renamed.includes("# {email} stays"));
+  ok("rename onto a taken name is refused", renameVar(added, "main", "email", "pw") === added);
+  ok("a run-time input (no entry) can be renamed too", renameVar(src, "main", "pw", "password").includes("{password}"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
