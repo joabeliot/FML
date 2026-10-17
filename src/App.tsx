@@ -26,6 +26,8 @@ import { expandPortal, type BubbleGraph } from "./lib/expandPortal.ts";
 import { docPositionKey, renamePosition } from "./lib/nodePositions.ts";
 import { dataGraph, inHandle, outHandle, visibleDataGraph, wireOptions } from "./lib/dataWires.ts";
 import { DataWirePicker } from "./components/DataWirePicker.tsx";
+import { RoadmapView } from "./components/RoadmapView.tsx";
+import ROADMAP_EXAMPLE from "../examples/roadmap.rml?raw";
 import { nodeSize } from "./lib/layout.ts";
 import type { FmlFlowNode } from "./types/chart.ts";
 import { fileKey, type Workspace } from "./types/workspace.ts";
@@ -53,11 +55,19 @@ function initialWorkspace(): Workspace {
   return sampleWorkspace();
 }
 
-/** After files are added or removed, choose which one to parse from. */
+/**
+ * `.rml` roadmaps share the workspace with flows, stored under their full
+ * name (`roadmap.rml`) — `fileKey` only strips `.fml`, so the two can't
+ * collide, and persistence, undo and the source panel work for both.
+ */
+const isRoadmapKey = (key: string): boolean => /\.rml$/i.test(key);
+
+/** After files are added or removed, choose which flow file to parse from. */
 function pickEntry(files: Record<string, string>, current: string): string {
-  if (files[current]) return current;
-  const withFof = Object.keys(files).find((k) => /^@fof\b/m.test(files[k] ?? ""));
-  return withFof ?? (files.app ? "app" : files.main ? "main" : Object.keys(files)[0] ?? "main");
+  const flows = Object.keys(files).filter((k) => !isRoadmapKey(k));
+  if (files[current] && !isRoadmapKey(current)) return current;
+  const withFof = flows.find((k) => /^@fof\b/m.test(files[k] ?? ""));
+  return withFof ?? (files.app ? "app" : files.main ? "main" : flows[0] ?? "main");
 }
 
 export function App() {
@@ -80,6 +90,8 @@ export function App() {
 
   // Data wires (FML-20): every capture → {name} link in the active doc. All
   // of them with the Data toggle on; otherwise just the selected node's.
+  // Flows or the roadmap (FML-21) — two views over one workspace.
+  const [view, setView] = useLocalStorage<"flows" | "roadmap">("protoarque_fml_view", "flows");
   const [dataOn, setDataOn] = useLocalStorage("protoarque_fml_datawires", false);
   const fullData = useMemo(() => dataGraph(chart.doc), [chart.doc]);
   const shownData = useMemo(
@@ -310,7 +322,11 @@ export function App() {
       setWs((prev) => {
         const files = { ...prev.files };
         delete files[name];
-        if (Object.keys(files).length === 0) return sampleWorkspace();
+        if (!Object.keys(files).some((k) => !isRoadmapKey(k))) {
+          // No flow left to show — bring the sample back, keep any roadmaps.
+          const sample = sampleWorkspace();
+          return { files: { ...files, ...sample.files }, entry: sample.entry };
+        }
         return { files, entry: pickEntry(files, prev.entry) };
       });
       setActiveDoc(null);
@@ -402,18 +418,26 @@ export function App() {
 
   const undoStack = useRef<Array<{ file: string; text: string }>>([]);
 
-  /** Apply one structural edit; false when it was a no-op (taken id, nothing there). */
-  const structural = useCallback(
-    (doc: FmlDoc, edit: (text: string, docName: string) => string): boolean => {
-      const { file, docName } = targetOf(doc);
+  /** Rewrite one workspace file, undoably; false when nothing changed. */
+  const editFile = useCallback(
+    (file: string, edit: (text: string) => string): boolean => {
       const before = ws.files[file] ?? "";
-      const after = edit(before, docName);
+      const after = edit(before);
       if (after === before) return false;
       undoStack.current = [...undoStack.current.slice(-49), { file, text: before }];
       setWs((prev) => ({ ...prev, files: { ...prev.files, [file]: after } }));
       return true;
     },
-    [targetOf, ws.files, setWs],
+    [ws.files, setWs],
+  );
+
+  /** Apply one structural edit; false when it was a no-op (taken id, nothing there). */
+  const structural = useCallback(
+    (doc: FmlDoc, edit: (text: string, docName: string) => string): boolean => {
+      const { file, docName } = targetOf(doc);
+      return editFile(file, (text) => edit(text, docName));
+    },
+    [targetOf, editFile],
   );
 
   const undo = useCallback(() => {
@@ -509,7 +533,7 @@ export function App() {
   const onDrop = useCallback(
     async (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const picked = Array.from(e.dataTransfer.files ?? []).filter((f) => f.name.endsWith(".fml"));
+      const picked = Array.from(e.dataTransfer.files ?? []).filter((f) => /\.(fml|rml)$/i.test(f.name));
       if (picked.length === 0) return;
       const added: Record<string, string> = {};
       for (const f of picked) added[fileKey(f.name)] = await f.text();
@@ -529,7 +553,7 @@ export function App() {
         setSel(null);
         setTrace(null);
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && !typing && run.status !== "running") {
+      if ((e.key === "Delete" || e.key === "Backspace") && !typing && run.status !== "running" && view === "flows") {
         e.preventDefault();
         deleteSelected();
       }
@@ -544,9 +568,21 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setSidebarOpen, deleteSelected, undo, run.status]);
+  }, [setSidebarOpen, deleteSelected, undo, run.status, view]);
 
-  const fileNames = useMemo(() => Object.keys(ws.files), [ws.files]);
+  const fileNames = useMemo(() => Object.keys(ws.files).filter((k) => !isRoadmapKey(k)), [ws.files]);
+
+  // -- roadmap view (FML-21) ----------------------------------------------
+  const roadmapFiles = useMemo(() => Object.keys(ws.files).filter(isRoadmapKey), [ws.files]);
+  const [roadmapPick, setRoadmapPick] = useLocalStorage<string | null>("protoarque_fml_roadmap", null);
+  const activeRoadmap = roadmapPick && roadmapFiles.includes(roadmapPick) ? roadmapPick : (roadmapFiles[0] ?? null);
+  const openFlowFile = useCallback(
+    (key: string) => {
+      setEntry(key);
+      setView("flows");
+    },
+    [setEntry, setView],
+  );
 
   // Identity of the *graph*, so the canvas refits when the doc actually
   // changes but sits still while a run repaints it.
@@ -572,7 +608,7 @@ export function App() {
   return (
     <ReactFlowProvider>
       <div className="flex h-full w-full">
-        {sidebarOpen && (
+        {sidebarOpen && view === "flows" && (
           <Sidebar
             files={fileNames}
             entry={ws.entry}
@@ -590,33 +626,75 @@ export function App() {
         )}
 
         <div className="relative flex-1" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
-          <FlowCanvas
-            chartNodes={canvasNodes}
-            chartEdges={allEdges}
-            selection={sel}
-            onSelect={setSel}
-            onOpenDoc={openDoc}
-            trace={trace}
-            onTrace={setTrace}
-            posDocKey={chart.posDocKey}
-            fitKey={fitKey}
-            focus={run.focus}
-            runActive={run.status !== "idle"}
-            padding={padding}
-            onConnect={run.status === "running" ? undefined : connect}
-            onDataDrop={(source, name, target, at) => {
-              // Bubble children belong to another doc.
-              if (target.includes("::")) return;
-              setPendingWire({ source, name, target, at });
-            }}
-          />
+          {view === "roadmap" ? (
+            <RoadmapView
+              files={roadmapFiles}
+              active={activeRoadmap}
+              onActive={setRoadmapPick}
+              source={activeRoadmap ? (ws.files[activeRoadmap] ?? "") : ""}
+              onEdit={(update) => {
+                if (activeRoadmap) editFile(activeRoadmap, update);
+              }}
+              flowFiles={fileNames}
+              onOpenFlow={openFlowFile}
+              onLoadExample={() => {
+                addFiles({ "roadmap.rml": ROADMAP_EXAMPLE });
+                setRoadmapPick("roadmap.rml");
+              }}
+              onRemove={removeFile}
+              rightInset={sourceOpen ? SOURCE_W : 0}
+            />
+          ) : (
+            <FlowCanvas
+              chartNodes={canvasNodes}
+              chartEdges={allEdges}
+              selection={sel}
+              onSelect={setSel}
+              onOpenDoc={openDoc}
+              trace={trace}
+              onTrace={setTrace}
+              posDocKey={chart.posDocKey}
+              fitKey={fitKey}
+              focus={run.focus}
+              runActive={run.status !== "idle"}
+              padding={padding}
+              onConnect={run.status === "running" ? undefined : connect}
+              onDataDrop={(source, name, target, at) => {
+                // Bubble children belong to another doc.
+                if (target.includes("::")) return;
+                setPendingWire({ source, name, target, at });
+              }}
+            />
+          )}
+
+          {/* Flows | Roadmap — the same workspace, two kinds of map. */}
+          <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 rounded-xl border border-line bg-surface/85 p-1 backdrop-blur-md">
+            {(["flows", "roadmap"] as const).map((v) => (
+              <button
+                key={v}
+                className={`rounded-lg px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
+                  view === v ? "bg-ink text-bg" : "text-ink-dim hover:bg-white/[0.06] hover:text-ink"
+                }`}
+                onClick={() => {
+                  setView(v);
+                  setSel(null);
+                }}
+              >
+                {v}
+                {v === "roadmap" && roadmapFiles.length > 0 && (
+                  <span className="ml-1 font-mono text-[9.5px] opacity-60">{roadmapFiles.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
           <Toolbar
             sourceOpen={sourceOpen}
             onToggleSource={() => setSourceOpen((v) => !v)}
             onAddFiles={addFiles}
-            entry={ws.entry}
-            entrySource={ws.files[ws.entry] ?? ""}
-            sidebarOpen={sidebarOpen}
+            mode={view}
+            saveName={view === "roadmap" ? (activeRoadmap ?? "roadmap.rml") : `${ws.entry}.fml`}
+            saveSource={view === "roadmap" ? (activeRoadmap ? (ws.files[activeRoadmap] ?? "") : "") : (ws.files[ws.entry] ?? "")}
+            sidebarOpen={sidebarOpen || view === "roadmap"}
             onToggleSidebar={() => setSidebarOpen(true)}
             errors={chart.errors}
             warnings={chart.warnings}
@@ -629,7 +707,7 @@ export function App() {
             onToggleData={() => setDataOn((v) => !v)}
           />
 
-          {sel && selResolved && (
+          {view === "flows" && sel && selResolved && (
             <PropertyPanel
               sel={{ kind: sel.kind, id: selResolved.rawId }}
               doc={selResolved.doc}
@@ -648,9 +726,13 @@ export function App() {
 
           {sourceOpen && (
             <SourcePanel
-              name={ws.entry}
-              value={ws.files[ws.entry] ?? ""}
-              onChange={setEntrySource}
+              name={view === "roadmap" && activeRoadmap ? activeRoadmap : ws.entry}
+              value={view === "roadmap" && activeRoadmap ? (ws.files[activeRoadmap] ?? "") : (ws.files[ws.entry] ?? "")}
+              onChange={
+                view === "roadmap" && activeRoadmap
+                  ? (text) => setWs((prev) => ({ ...prev, files: { ...prev.files, [activeRoadmap]: text } }))
+                  : setEntrySource
+              }
               onClose={() => setSourceOpen(false)}
             />
           )}
@@ -658,11 +740,11 @@ export function App() {
           {/* Lifts clear of the run bar rather than hiding under it. */}
           <div style={{ position: "absolute", inset: 0, bottom: runBarH, pointerEvents: "none" }}>
             <div className="relative h-full w-full [&>*]:pointer-events-auto">
-              <WalkthroughPanel nodes={chart.nodes} edges={chart.doc.edges} />
+              {view === "flows" && <WalkthroughPanel nodes={chart.nodes} edges={chart.doc.edges} />}
             </div>
           </div>
 
-          {run.status !== "idle" && (
+          {view === "flows" && run.status !== "idle" && (
             <RunBar
               run={run}
               open={runBarOpen}

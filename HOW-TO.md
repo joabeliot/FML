@@ -785,6 +785,53 @@ per journey, assembled at the top of the entry file:
 
 ---
 
+## RML — roadmaps
+
+`.rml` files map a *project* instead of a flow. They use the same grammar as
+FML, with different node types and a different meaning for arrows:
+
+```
+@nodes
+  auth     = feature
+  billing  = feature
+  launch   = milestone
+
+@node auth {
+  status: done
+  area: platform
+  description: Sign-in, sessions, password reset
+  fml: auth
+  ticket: FML-11, FML-12
+}
+
+@flow
+  auth -> launch        # launch depends on auth
+  billing -> launch     # …and on billing
+```
+
+| key | meaning |
+|---|---|
+| `status` | `pending` (default), `active` or `done`; you set it by hand |
+| `area` | a category; nodes in the same area share a colour |
+| `description` | shown on hover and in the side panel |
+| `fml` | the `.fml` that proves it; opens in the flow view if it's loaded |
+| `ticket` | lore ticket ids, comma-separated, shown as references |
+
+Switch to **Roadmap** at the top of the canvas, then open a `.rml` file (or
+load the example, `examples/roadmap.rml`, which is F*ML's own roadmap).
+
+- **Done** tiles are lit in their area's colour, and **active** ones are lit
+  with a gold ring.
+- A pending tile whose dependencies are all done is **ready**: dark, with a
+  coloured outline and a `NEXT` tag. That's your frontier.
+- Everything else is **locked**.
+- Connectors turn gold once their prerequisite is done.
+- Click a tile to change its status (written straight into the file, ⌘Z to
+  undo) and to follow its flows, tickets, and what it depends on and unlocks.
+
+The footer flags a status outside the three, a key RML doesn't know, and
+dependency cycles.
+
 ## Modelling an app
 
 | App concept | FML |

@@ -8,9 +8,11 @@ interface Props {
   sourceOpen: boolean;
   onToggleSource: () => void;
   onAddFiles: (files: Record<string, string>) => void;
-  /** Current entry file, for the download button. */
-  entry: string;
-  entrySource: string;
+  /** Which view the toolbar serves — the roadmap has no runs, nodes or wires to add. */
+  mode: "flows" | "roadmap";
+  /** File name and text the Save button downloads. */
+  saveName: string;
+  saveSource: string;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   errors: FmlIssue[];
@@ -88,11 +90,11 @@ export function Toolbar(props: Props) {
   }
 
   function download() {
-    const blob = new Blob([props.entrySource], { type: "text/plain" });
+    const blob = new Blob([props.saveSource], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${props.entry}.fml`;
+    a.download = props.saveName;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -102,7 +104,7 @@ export function Toolbar(props: Props) {
       <input
         ref={fileRef}
         type="file"
-        accept=".fml,text/plain"
+        accept=".fml,.rml,text/plain"
         multiple
         className="hidden"
         onChange={onPick}
@@ -121,68 +123,72 @@ export function Toolbar(props: Props) {
         </>
       )}
 
-      {/* The primary action, first and visually weightier than the rest —
-          running the flow is what this whole thing is for. */}
-      <button
-        className={`${btn} ${
-          props.running
-            ? "bg-danger/15 text-danger ring-1 ring-danger/40 hover:bg-danger/25"
-            : props.canRun
-              ? "bg-api/15 text-api ring-1 ring-api/40 hover:bg-api/25"
-              : "cursor-not-allowed text-ink-mute/50"
-        }`}
-        disabled={!props.canRun && !props.running}
-        onClick={props.running ? props.onStop : props.onRun}
-        title={
-          props.running
-            ? "Stop the run"
-            : props.canRun
-              ? "Send this flow's api calls"
-              : "This doc has no api nodes to run"
-        }
-      >
-        {props.running ? "■ Stop" : "▶ Run"}
-      </button>
-      <span className={sep} />
+      {props.mode === "flows" && (
+        <>
+          {/* The primary action, first and visually weightier than the rest —
+              running the flow is what this whole thing is for. */}
+          <button
+            className={`${btn} ${
+              props.running
+                ? "bg-danger/15 text-danger ring-1 ring-danger/40 hover:bg-danger/25"
+                : props.canRun
+                  ? "bg-api/15 text-api ring-1 ring-api/40 hover:bg-api/25"
+                  : "cursor-not-allowed text-ink-mute/50"
+            }`}
+            disabled={!props.canRun && !props.running}
+            onClick={props.running ? props.onStop : props.onRun}
+            title={
+              props.running
+                ? "Stop the run"
+                : props.canRun
+                  ? "Send this flow's api calls"
+                  : "This doc has no api nodes to run"
+            }
+          >
+            {props.running ? "■ Stop" : "▶ Run"}
+          </button>
+          <span className={sep} />
 
-      {/* Add a node: pick a type, get a declared node with a fresh id, already
-          selected so it can be renamed and filled in from the property panel. */}
-      <div ref={addRef} className="relative">
-        <button
-          className={`${btn} ${addOpen ? on : idle} ${props.running ? "cursor-not-allowed opacity-40" : ""}`}
-          disabled={props.running}
-          onClick={() => setAddOpen((v) => !v)}
-          title="Add a node to this doc"
-        >
-          + Node
-        </button>
-        {addOpen && (
-          <div className="absolute left-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-xl border border-line bg-surface p-1 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.7)]">
-            {NODE_TYPES.map((t) => (
-              <button
-                key={t.type}
-                className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
-                onClick={() => {
-                  setAddOpen(false);
-                  props.onAddNode(t.type);
-                }}
-              >
-                <span className="mt-[1px]" style={{ color: kindColor(t.type) }}>
-                  <Glyph kind={t.type} size={12} />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-[11.5px] font-medium text-ink">{t.label}</span>
-                  <span className="text-[10.5px] leading-snug text-ink-mute">{t.summary}</span>
-                </span>
-              </button>
-            ))}
+          {/* Add a node: pick a type, get a declared node with a fresh id, already
+              selected so it can be renamed and filled in from the property panel. */}
+          <div ref={addRef} className="relative">
+            <button
+              className={`${btn} ${addOpen ? on : idle} ${props.running ? "cursor-not-allowed opacity-40" : ""}`}
+              disabled={props.running}
+              onClick={() => setAddOpen((v) => !v)}
+              title="Add a node to this doc"
+            >
+              + Node
+            </button>
+            {addOpen && (
+              <div className="absolute left-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-xl border border-line bg-surface p-1 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.7)]">
+                {NODE_TYPES.map((t) => (
+                  <button
+                    key={t.type}
+                    className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
+                    onClick={() => {
+                      setAddOpen(false);
+                      props.onAddNode(t.type);
+                    }}
+                  >
+                    <span className="mt-[1px]" style={{ color: kindColor(t.type) }}>
+                      <Glyph kind={t.type} size={12} />
+                    </span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-[11.5px] font-medium text-ink">{t.label}</span>
+                      <span className="text-[10.5px] leading-snug text-ink-mute">{t.summary}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      <span className={sep} />
+          <span className={sep} />
+        </>
+      )}
 
       <button className={`${btn} ${idle}`} onClick={() => fileRef.current?.click()}>
-        Open&nbsp;.fml
+        Open
       </button>
       <button className={`${btn} ${idle}`} onClick={download} title="Save the entry file">
         Save
@@ -193,15 +199,17 @@ export function Toolbar(props: Props) {
       <button className={`${btn} ${props.sourceOpen ? on : idle}`} onClick={props.onToggleSource}>
         Source
       </button>
-      <button
-        className={`${btn} ${props.dataOn ? on : idle}`}
-        onClick={props.onToggleData}
-        title="Show every data wire — which captured value feeds which node. Off: only the selected node's."
-      >
-        Data
-      </button>
+      {props.mode === "flows" && (
+        <button
+          className={`${btn} ${props.dataOn ? on : idle}`}
+          onClick={props.onToggleData}
+          title="Show every data wire — which captured value feeds which node. Off: only the selected node's."
+        >
+          Data
+        </button>
+      )}
 
-      {issueCount > 0 && (
+      {props.mode === "flows" && issueCount > 0 && (
         <>
           <span className={sep} />
           <div ref={issuesRef} className="relative">
