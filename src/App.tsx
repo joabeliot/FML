@@ -24,7 +24,7 @@ import {
 import { addEdge, addNode, deleteEdge, deleteNode, renameNode, uniqueNodeId } from "./lib/fmlStructure.ts";
 import { expandPortal, type BubbleGraph } from "./lib/expandPortal.ts";
 import { docPositionKey, renamePosition } from "./lib/nodePositions.ts";
-import { dataGraph, inHandle, outHandle, visibleDataGraph, wireOptions } from "./lib/dataWires.ts";
+import { dataGraph, inHandle, outHandle, visibleDataGraph, wireOptions, type DataGraph } from "./lib/dataWires.ts";
 import { DataWirePicker } from "./components/DataWirePicker.tsx";
 import { RoadmapView } from "./components/RoadmapView.tsx";
 import ROADMAP_EXAMPLE from "../examples/roadmap.rml?raw";
@@ -94,10 +94,20 @@ export function App() {
   const [view, setView] = useLocalStorage<"flows" | "roadmap">("protoarque_fml_view", "flows");
   const [dataOn, setDataOn] = useLocalStorage("protoarque_fml_datawires", false);
   const fullData = useMemo(() => dataGraph(chart.doc), [chart.doc]);
-  const shownData = useMemo(
-    () => visibleDataGraph(fullData, dataOn, sel?.kind === "node" ? sel.id : null),
-    [fullData, dataOn, sel],
-  );
+  // Identity matters here: a new graph object rebuilds every canvas node,
+  // and doing that on the first click of a double-click swallowed the
+  // double-click (portal drill-in broke). So the visible graph only changes
+  // identity when what it shows actually changes.
+  const shownRef = useRef<{ key: string; graph: DataGraph } | null>(null);
+  const shownData = useMemo(() => {
+    const graph = visibleDataGraph(fullData, dataOn, sel?.kind === "node" ? sel.id : null);
+    const key = `${fullData.wires.length}|${[...graph.ports].map(([id, p]) => `${id}:${p.inputs.map((i) => `${i.name}/${i.source}`).join(",")}>${p.outputs.join(",")}`).join(";")}|${graph.wires.map((w) => w.id).join(",")}`;
+    if (shownRef.current && shownRef.current.key === key && shownRef.current.graph.ports.size === graph.ports.size) {
+      return shownRef.current.graph;
+    }
+    shownRef.current = { key, graph };
+    return graph;
+  }, [fullData, dataOn, sel]);
   const [pendingWire, setPendingWire] = useState<{
     source: string;
     name: string;
