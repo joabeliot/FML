@@ -317,6 +317,15 @@ header.
 There's **no default tolerance**: a bare `~11900` is a lint warning and fails
 the step. A hidden 1% is exactly what you forget about when a test goes red.
 
+**Headers** are paths too, and case-insensitive — this is where `matches`,
+`exists` and `absent` earn their keep:
+
+```
+  assert.header.ETag: matches ^"[^"]+"$      # strong ETag, not W/"…"
+  assert.header.Cache-Control: exists
+  assert.header.Set-Cookie: absent
+```
+
 `{name}` works on the right-hand side — including a value this same node just
 captured, because captures run first, then `expect`, then asserts.
 

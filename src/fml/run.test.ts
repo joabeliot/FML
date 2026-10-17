@@ -342,6 +342,50 @@ function fakeTransport(
   eq("--fail-fast stops on a failed assert", stop.steps.map((s) => s.nodeId), ["a"]);
 }
 
+// 5d. header assertions — the Flock weak-ETag case -------------------------
+{
+  const node = {
+    id: "media",
+    type: "api",
+    data: {
+      url: "https://a.test/media",
+      "assert.header.ETag": 'matches ^"[^"]+"$',
+      "assert.header.cache-control": "exists",
+      "assert.header.Set-Cookie": "absent",
+    },
+  };
+  const strong = await runNode(
+    node,
+    {},
+    {},
+    fakeTransport([{ headers: { etag: '"abc123"', "Cache-Control": "max-age=60" } }]).transport,
+  );
+  ok("strong ETag passes; header names are case-insensitive", strong.ok, strong.error);
+
+  // The edge rewrote a strong ETag to a weak one — the origin's exact
+  // If-None-Match comparison then never matched. A regex catches it.
+  const weak = await runNode(
+    node,
+    {},
+    {},
+    fakeTransport([{ headers: { ETag: 'W/"abc123"', "cache-control": "no-store" } }]).transport,
+  );
+  ok("a weakened ETag fails the match", !weak.ok);
+  eq("only the ETag assert failed", weak.asserts.map((a) => a.ok), [false, true, true]);
+
+  const leaked = await runNode(
+    node,
+    {},
+    {},
+    fakeTransport([{ headers: { ETag: '"a"', "cache-control": "x", "set-cookie": "s=1" } }]).transport,
+  );
+  ok("absent catches a header that shouldn't be there", !leaked.ok);
+  ok("and says what it saw", leaked.error?.includes("s=1") === true, leaked.error);
+
+  const missing = await runNode(node, {}, {}, fakeTransport([{ headers: { ETag: '"a"' } }]).transport);
+  ok("exists catches a missing header", missing.asserts[1]?.ok === false);
+}
+
 // 6. chooseEdge ------------------------------------------------------------
 {
   const edges = [
