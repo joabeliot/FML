@@ -1,13 +1,37 @@
 # Context — F*ML
 
 **Focus:** FML — `.fml` Flowchart Markup Language: parser (`src/fml/`) + web viewer (React Flow + dagre) — and now RML (`.rml` roadmaps, `src/rml/`) on the same grammar
-**Phase:** R&D → the north star is real. Flows execute and check correctness (`assert.*`, bytes, ETag), drive a real browser (`ui` nodes, FML-19), emit a JSON report with redaction, load secrets from `.fml.env`, and can be checked against an OpenAPI spec (`npm run drift`). The dashboard edits structure, shows data wires, and has a Roadmap view for `.rml`. Three test layers guard all of it: `npm test` (unit + CLI), `npm run test:e2e` (Playwright, dashboard), `npm run test:all`. Live at https://protoarch.web.app / https://fml.arque.app (not redeployed since the first merges)
-**Open:** PR #1 (`feature/rml`: FML-18/20/21 + two fixes cherry-picked 2026-10-17) verified and ready, but the merge was blocked by the session's permission system, so a human has to merge it; then deploy. Stacked after it: `feature/design-live-sync-ui-steps` (designs, FML-24 filed) → `feature/ui-steps` (FML-19, the regression suite, the same fixes). FML-24 (live sync v1) awaits sign-off on `ideas/live-sync.md`. FML-16 is blocked on Flock access. The lore CLI fix is on joabeliot/lore `fix/shorthand-attach`, local only (that repo's rule: no push without JB's OK). Also open: decrypt-then-hash; routing on a captured value; `#` in values (bites `ui` selectors after a space); `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describe protoarque
-**Next:** merge PR #1 → deploy; review the stacked branches; sign off FML-24; push the lore fix. Every change runs `npm run test:all` before it ships
+**Phase:** R&D → the north star is real. Flows execute and check correctness (`assert.*`, bytes, ETag), drive a real browser (`ui` nodes, FML-19), **stop to ask a person mid-run** (`ask.<name>` / `pause`, FML-26), emit a JSON report with redaction, load secrets from `.fml.env`, and can be checked against an OpenAPI spec (`npm run drift`). The dashboard edits structure, keeps data ports always visible, has variable nodes (FML-27), and has an editable skill-tree Roadmap view for `.rml` (FML-28). Three test layers guard all of it: `npm test` (13 suites), `npm run test:e2e` (Playwright, 66 checks), `npm run test:all`. Live at https://protoarch.web.app / https://fml.arque.app (not redeployed since the first merges)
+**Open:** PR #1 (`feature/rml`) is ready, but its merge was blocked by the session's permission system, so a human has to merge it, then deploy. The stack after it, pushed, merges in this order: `feature/design-live-sync-ui-steps` → `feature/ui-steps` (FML-19) → `feature/data-vars` (FML-27) → `feature/roadmap-editor` (FML-28 + a port-drop fix) → `feature/pause-input` (FML-26). Other open items:
+- FML-24 (live sync v1) awaits sign-off.
+- FML-16 is blocked on Flock access.
+- The lore CLI fix (joabeliot/lore `fix/shorthand-attach`) is local only.
+- Also open: decrypt-then-hash, routing on a captured value, `#` in values, and `INDEX.md`/`GUARDRAILS.md`/`architecture/*.md` still describing protoarque.
+
+**Next:** merge PR #1, deploy, then review and merge the stack in order. Joab may want UX tweaks to the roadmap look, the variable nodes or the ask dialog. Sign off FML-24 and push the lore fix. Every change runs `npm run test:all` before it ships.
 
 ---
 
 ## Log
+
+### 2026-10-17 (cont.) — Joab / Claude — FML-27 variable nodes, FML-28 skill-tree roadmap, FML-26 ask/pause
+- **FML-27** (`feature/data-vars`):
+  - Data ports show without selecting.
+  - `@vars` and run-time inputs are pill nodes on the canvas: + Node → Variable, VarPanel rename/value/delete via `setVar`/`renameVar`.
+  - Dropping a var's port onto an input port repoints that `{ref}`.
+- **FML-28** (`feature/roadmap-editor`):
+  - Roadmap rendered as a game talent tree, from Joab's reference image: an octilinear grid (`src/lib/radialLayout.ts`), square/diamond tiles, gold lit links and an `icon:` key.
+  - Editable in the view: add tile, drag-link with cycles refused, unlink, delete, every field, New roadmap.
+  - Also fixed: a wire dropped on an input port sometimes snapped to the control handle beside it.
+- **FML-26** (`feature/pause-input`):
+  - `ask.<name>: <prompt>` and `pause: <message>` on any node, through an injected `AskHandler`.
+  - App: a modal mid-run.
+  - CLI: a terminal prompt on stderr, `--yes`, `FML_ASK=stdin`.
+  - A value supplied up front isn't asked. With no handler the step fails with a hint. Cancelling gives `stoppedBecause: "cancelled"`. Answers are never recorded and secrets are redacted.
+  - Design notes in `lore/features/ask-and-pause.md`.
+- All green: 13 unit suites, build, e2e 66/66.
+
+Loaded: CLAUDE.md, lore/CONTEXT.md, lore/features/node-sockets.md, lore/features/rml.md, lore/testing/registry.md
 
 ### 2026-10-17 (cont.) — Joab / Claude — FML-19, regression suite, PR #1, lore fix
 - **PR #1** (JB's, `feature/rml` → main): reviewed (my seven commits only;
