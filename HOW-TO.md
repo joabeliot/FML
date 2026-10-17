@@ -106,7 +106,7 @@ LoginScreen = page   # also a comment (after whitespace)
 - **type** — one of the five standard types below.
 - Every box referenced in `@flow` must be declared here, or the parser errors.
 
-### The five node types
+### The six node types
 
 The type is what makes a diagram mean something rather than just look like
 something. Pick from this vocabulary:
@@ -118,6 +118,7 @@ something. Pick from this vocabulary:
 | `decision` | a branch — the outgoing arrows are the answers | amber | a fork |
 | `event` | something that happens *to* the app: cold start, push, deep link, webhook | pink | a burst |
 | `flow` | a portal standing for another doc (`@doc` / `@fof`) | violet | a doorway |
+| `ui` | a step that drives a browser: open, fill, click, then check the page | cyan | a pointer |
 
 Each type has keys it is expected to carry, and keys that are merely useful:
 
@@ -128,6 +129,7 @@ Each type has keys it is expected to carry, and keys that are merely useful:
 | `decision` | — | `condition`, `note` |
 | `event` | — | `source`, `payload`, `note` |
 | `flow` | `doc` | `note` |
+| `ui` | — | `open`, `fill.<field>`, `click`, `press`, `wait`, `capture.<var>`, `assert.<path>`, `screenshot`, `note` |
 
 Only the keys in **expected** are checked, because only those stop the node from
 doing its job: an `api` that names no request can't be sent, a `flow` portal
@@ -570,6 +572,86 @@ flagged. A host built from a `{var}` can't be ruled out, so it's checked.
 
 The spec has to be a local file in JSON or YAML. Download it first; the
 command doesn't fetch URLs.
+
+### UI steps: driving a browser inside a flow
+
+An API flow stops at the API. A lot of bugs only show up when someone uses
+the real UI, so a `ui` node opens a page, types, clicks, and checks what the
+page shows. Values move between `api` and `ui` nodes the same way they move
+between two API calls:
+
+```
+@meta
+  base: https://api.example.com
+  ui_base: https://app.example.com     # relative `open:` paths join onto this
+
+@node createItem {
+  method: POST
+  path: /items
+  body: {"name": "Spring sale"}
+  capture.itemId: $.id
+  expect: 201
+}
+
+@node openItem {
+  open: /items/{itemId}
+  wait: [data-testid=item-title]
+  assert.title: text([data-testid=item-title]) == Spring sale
+  capture.status: text([data-testid=status])
+  screenshot: item-page
+}
+
+@node publish {
+  click: button.publish
+  wait: [data-testid=toast]
+  assert.toast: text([data-testid=toast]) matches ^Published
+  assert.url: matches /items/{itemId}$
+}
+```
+
+A `ui` node always does things in this order: `open` → `fill.<field>` (in
+the order written) → `click` → `press` → `wait`. Then it runs its captures
+and asserts, then takes its `screenshot`. One node can't click twice,
+because a block's keys are a map; a longer journey is a chain of `ui` nodes,
+which is how it reads on the canvas anyway.
+
+| key | does |
+|---|---|
+| `open` | go to a URL (absolute, or relative to `@meta ui_base`) |
+| `fill.<field>` | type into the field whose `name`, `id` or `data-testid` is `<field>`; start the value with `sel(<css>)` to target any other element: `fill.q: sel(.search input) {term}` |
+| `click` | click the first element matching a CSS selector |
+| `press` | press a key: `press: Enter` (focused element) or `press: input[name=q] Enter` |
+| `wait` | wait until a selector is visible |
+| `screenshot` | save a full-page PNG under that name (`true` uses the node id) |
+
+**Reading the page**, for `capture` and `assert`: `text(sel)`, `value(sel)`,
+`count(sel)`, `visible(sel)`, `attr(sel, name)`, plus `url` and `title`. A
+key can't hold a CSS selector, so put the read at the start of the value:
+`assert.heading: text(h1) == Welcome`. For `url` and `title` the key suffix
+is the path, the same as `assert.status`: `assert.url: matches /done$`.
+
+**Where they run:** from the CLI, with Playwright driving Chrome. It uses
+Playwright's bundled Chromium if you've run `npx playwright install
+chromium`; otherwise it uses your installed Google Chrome. Set
+`FML_UI_BROWSER=chrome|chromium` to force one.
+
+```bash
+node scripts/run.ts examples/ui.fml                    # headless
+node scripts/run.ts examples/ui.fml --headed           # watch it
+node scripts/run.ts examples/ui.fml --artifacts out    # screenshots → ./out (default ./fml-artifacts)
+```
+
+The in-app **▶ Run** can't drive a browser from inside a page, so it shows
+`ui` steps as **skipped** (–), never as passed or failed. If a `ui` action
+fails (an element never appears, say) the walk stops, because the page is in
+an unknown state and everything after would fail for that reason rather than
+its own. A failed capture or assert scores the step red and the walk carries
+on, the same as for `api`. `--json` reports each `ui` step's actions and
+screenshot path.
+
+`#` starts a comment after a space, so write `[id=submit]` rather than
+` #submit` in a selector. (`button#submit`, with no space before `#`, is
+fine.)
 
 ### Running a flow from the app
 

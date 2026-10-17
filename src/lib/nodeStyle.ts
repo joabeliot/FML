@@ -48,6 +48,8 @@ const GLYPH: Record<string, string> = {
     "M8 2.5v3 M8 10.5v3 M2.5 8h3 M10.5 8h3 M4.4 4.4l2.1 2.1 M9.5 9.5l2.1 2.1 M11.6 4.4L9.5 6.5 M6.5 9.5l-2.1 2.1",
   // a doorway you can step through
   flow: "M4 2.5h8v11H4z M9.7 8.2h.01",
+  // a pointer clicking — something done *to* a screen
+  ui: "M4 3l7.5 3.6-3.1 1 2.6 3.9-1.4.9-2.6-3.9-2.3 2.3z",
 };
 
 export function kindGlyph(kind: string): string | undefined {

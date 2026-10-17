@@ -1,7 +1,12 @@
 # UI steps: drive a browser inside a flow (FML-19 design)
 
-Status: **design, awaiting sign-off.** The ticket says design first and keep
-it optional.
+Status: **built (2026-10-17), signed off by Joab.** The open questions went
+with the leanings below: a new `ui` type, Playwright, screenshots on disk.
+One change from this design while building: keys can't hold CSS selectors
+(the key charset is `[A-Za-z0-9_.-]`), so it's `fill.<field>` (name / id /
+data-testid) with a `sel(<css>)` value prefix for anything else, rather than
+`fill.<selector>`. Playwright became a devDependency, because the dashboard
+end-to-end tests use it too. HOW-TO has the user-facing reference.
 
 ## Why
 

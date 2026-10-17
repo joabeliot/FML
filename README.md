@@ -55,7 +55,7 @@ Full reference: **[HOW-TO.md](HOW-TO.md)**.
 | `@doc <name>` | more than one diagram in one file |
 | `@fof <path>` | pull in another `.fml` file (no extension — it's always `.fml`) |
 
-Five node types carry the meaning: `page`, `api`, `decision`, `event`, `flow`.
+Six node types carry the meaning: `page`, `api`, `decision`, `event`, `flow`, `ui`.
 Anything else draws but warns.
 
 ## Development

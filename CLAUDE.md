@@ -29,12 +29,13 @@ into the source file.
 | Path | What lives there |
 |---|---|
 | `src/fml/` | The language. Parser, node-type standard, stats. **Zero dependencies** — keep it that way, it has to run in Node and the browser. |
-| `src/fml/nodeTypes.ts` | The canonical node vocabulary (`page`/`api`/`decision`/`event`/`flow`) and their expected keys. Changing it changes the language. |
+| `src/fml/nodeTypes.ts` | The canonical node vocabulary (`page`/`api`/`decision`/`event`/`flow`/`ui`) and their expected keys. Changing it changes the language. |
 | `src/fml/variables.ts` | `{name}` resolution — `@vars` defaults + `capture.<name>` on an earlier node in the same doc. Per-doc scope; cross-doc (through a `flow` portal) is an open question, not decided. |
 | `src/fml/run.ts` | The execution engine — sends `api` nodes, threads `capture`d values, asserts `expect`, routes on status. **Takes its transport as an argument** — never call the network from in here, that's what keeps it testable and CORS-agnostic. |
 | `src/fml/assert.ts` | The `assert.<path>` comparison grammar — parse (for lint) and evaluate (for the runner). |
 | `src/fml/report.ts` | The machine-readable run report (`--json`/`--report`) and value-based secret redaction. Pure — the CLI decides where it goes. |
 | `src/fml/drift.ts` | Flow ↔ OpenAPI drift: unknown paths/methods, undocumented statuses, coverage. Takes the spec as an object; `scripts/drift.ts` reads JSON/YAML (the `yaml` devDependency lives there, never in `src/fml/`). |
+| `scripts/uiDriver.ts` | The CLI's `UiDriver` (FML-19): Playwright behind `run.ts`'s interface, loaded only when a flow has a `ui` node. Bundled Chromium, else the machine's Chrome. |
 | `scripts/run.ts` | CLI runner (`npm run run-flow -- <file.fml>`). Node has no CORS, so flows execute today. `--dry` prints the request plan. |
 | `src/fml/lint.ts` | Semantic checks on a parsed doc — typo'd keys, unrunnable paths, malformed `expect`. Keyed by node id, not line, so the canvas can point at them. |
 | `src/lib/httpTransport.ts` | The browser's transport. Dev routes through `vite/devProxy.ts`; the built site calls `fetch` directly and therefore only reaches CORS-permissive APIs. |

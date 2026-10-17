@@ -11,6 +11,8 @@ const FAIL = "var(--color-danger)";
 
 function Mark({ step }: { step: StepResult }) {
   if (step.passthrough) return <span className="text-ink-mute/50">·</span>;
+  // A ui step the in-app runner can't drive — neither a pass nor a fail.
+  if (step.skipped) return <span className="text-ink-mute" title={step.skipped}>–</span>;
   return (
     <span style={{ color: step.ok ? PASS : FAIL }}>{step.ok ? "✔" : "✖"}</span>
   );

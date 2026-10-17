@@ -15,8 +15,12 @@
 //      logic, so the engine can be finished and tested before that decision.
 //
 // See lore/ideas/flow-execution.md for the key vocabulary this implements.
+//
+// `ui` nodes (FML-19) follow the same rule with a browser instead of the
+// network: the caller passes a `UiDriver`, this file never imports one. No
+// driver (the in-app runner) means `ui` steps are skipped, not failed.
 
-import { evaluateAssertion, parseAssertion } from "./assert.ts";
+import { callEnd, evaluateAssertion, parseAssertion } from "./assert.ts";
 import type { FmlDoc, FmlEdge, FmlNode } from "./types.ts";
 
 // -- transport ------------------------------------------------------------
@@ -43,6 +47,35 @@ export interface HttpResponse {
 }
 
 export type Transport = (req: HttpRequest, signal?: AbortSignal) => Promise<HttpResponse>;
+
+// -- UI driver (FML-19) -----------------------------------------------------
+
+export type UiActionKind = "open" | "fill" | "click" | "press" | "wait";
+
+/** One thing to do on the page. `target` is a URL for `open`, a selector otherwise. */
+export interface UiAction {
+  kind: UiActionKind;
+  target: string;
+  /** The text for `fill`, the key for `press`. */
+  value?: string;
+}
+
+/**
+ * What a `ui` node needs from a browser. Injected exactly like `Transport` —
+ * the CLI hands in a Playwright-backed one (scripts/uiDriver.ts), tests hand
+ * in a fake, and the browser app has none.
+ */
+export interface UiDriver {
+  perform(action: UiAction, signal?: AbortSignal): Promise<void>;
+  /**
+   * Read a value off the page for `capture` / `assert`: `url`, `title`, or a
+   * page read — `text(sel)`, `count(sel)`, `value(sel)`, `visible(sel)`,
+   * `attr(sel, name)`. Undefined when it leads nowhere.
+   */
+  read(path: string): Promise<string | undefined>;
+  /** Save a screenshot under this name and return where it went. */
+  screenshot(name: string): Promise<string>;
+}
 
 // -- interpolation --------------------------------------------------------
 
@@ -312,6 +345,10 @@ export interface StepResult {
   type: string;
   /** No request was sent — a `page`/`decision`/`event`/`flow` node just routes. */
   passthrough: boolean;
+  /** A `ui` step that didn't run, and why (no driver — the in-app runner). Still `ok`. */
+  skipped?: string;
+  /** What a `ui` step did, in order, and where its screenshot went. */
+  ui?: { actions: string[]; screenshot?: string };
   request?: HttpRequest;
   response?: HttpResponse;
   captures: CaptureResult[];
@@ -325,7 +362,7 @@ export interface StepResult {
    * Which check `error` is about, when the step failed — the first one in
    * runNode's precedence: no response at all, then status, capture, assert.
    */
-  failedOn?: "request" | "status" | "capture" | "assert";
+  failedOn?: "request" | "status" | "capture" | "assert" | "ui";
   durationMs?: number;
 }
 
@@ -349,7 +386,7 @@ function assertKeys(node: FmlNode): Array<[string, string]> {
  */
 async function evaluateAsserts(
   node: FmlNode,
-  response: HttpResponse,
+  read: (path: string) => Promise<string | undefined>,
   vars: Record<string, string>,
 ): Promise<AssertResult[]> {
   const out: AssertResult[] = [];
@@ -361,7 +398,7 @@ async function evaluateAsserts(
       continue;
     }
     const a = parsed.assertion;
-    const actual = await resolvePath(response, a.path);
+    const actual = await read(a.path);
     const { text: operand, missing } = interpolate(a.operand, vars);
     const outcome =
       missing.length > 0
@@ -394,6 +431,7 @@ export async function runNode(
   vars: Record<string, string>,
   transport: Transport,
   signal?: AbortSignal,
+  ui?: UiDriver,
 ): Promise<StepResult> {
   const base: StepResult = {
     nodeId: node.id,
@@ -404,6 +442,7 @@ export async function runNode(
     ok: true,
   };
 
+  if (node.type === "ui") return runUiNode(node, meta, vars, base, ui, signal);
   if (node.type !== "api") return { ...base, passthrough: true };
 
   const built = buildRequest(node, meta, vars);
@@ -444,7 +483,7 @@ export async function runNode(
   const expect = node.data.expect?.trim();
   const statusOk = !expect || statusMatches(expect, response.status);
   const failedCapture = captures.find((c) => !c.ok);
-  const asserts = await evaluateAsserts(node, response, vars);
+  const asserts = await evaluateAsserts(node, (path) => resolvePath(response, path), vars);
   const failedAssert = asserts.find((a) => !a.ok);
 
   let error: string | undefined;
@@ -474,6 +513,159 @@ export async function runNode(
   };
 }
 
+// -- running a ui node (FML-19) --------------------------------------------
+
+/**
+ * The actions a `ui` node asks for, in the one order a node performs them:
+ * open → fill.<selector> (as written) → click → press → wait. A longer
+ * journey is a chain of `ui` nodes — a block's keys are a map, so one node
+ * can't hold two clicks in sequence.
+ */
+export function uiActions(
+  node: FmlNode,
+  meta: Record<string, string>,
+  vars: Record<string, string>,
+): { actions: UiAction[]; missing: string[]; error?: string } {
+  const missing: string[] = [];
+  const sub = (value: string): string => {
+    const { text, missing: gaps } = interpolate(value.trim(), vars);
+    for (const n of gaps) if (!missing.includes(n)) missing.push(n);
+    return text;
+  };
+  const data = node.data;
+  const actions: UiAction[] = [];
+
+  const open = data.open?.trim();
+  if (open) {
+    let url = sub(open);
+    if (!/^[a-z]+:\/\//i.test(url)) {
+      const base = sub(meta.ui_base ?? "");
+      if (!base) {
+        return { actions, missing, error: `${node.id}: "open: ${open}" is relative but the doc has no "@meta ui_base"` };
+      }
+      url = joinUrl(base, url);
+    }
+    actions.push({ kind: "open", target: url });
+  }
+  for (const [key, value] of Object.entries(data)) {
+    if (!key.startsWith("fill.")) continue;
+    // A key can't hold a CSS selector, so the suffix names a form field —
+    // by name, id or test id. `sel(<css>)` at the start of the value targets
+    // anything else.
+    const raw = value.trim();
+    const end = callEnd(raw, ["sel"]);
+    const target = end !== undefined ? sub(raw.slice(4, end - 1)) : fieldSelector(key.slice("fill.".length));
+    actions.push({ kind: "fill", target, value: sub(end !== undefined ? raw.slice(end).trim() : raw) });
+  }
+  if (data.click?.trim()) actions.push({ kind: "click", target: sub(data.click) });
+  if (data.press?.trim()) {
+    // `press: Enter` presses on the focused element; `press: input[name=q] Enter` on a selector.
+    const raw = sub(data.press);
+    const split = raw.lastIndexOf(" ");
+    actions.push(
+      split === -1 ? { kind: "press", target: "", value: raw } : { kind: "press", target: raw.slice(0, split), value: raw.slice(split + 1) },
+    );
+  }
+  if (data.wait?.trim()) actions.push({ kind: "wait", target: sub(data.wait) });
+  return { actions, missing };
+}
+
+/** `fill.<field>` → the field by name, id or test id, whichever the page uses. */
+export function fieldSelector(field: string): string {
+  const f = field.replace(/"/g, '\\"');
+  return `[name="${f}"], [id="${f}"], [data-testid="${f}"]`;
+}
+
+const describe = (a: UiAction): string =>
+  a.kind === "fill" ? `fill ${a.target} = ${a.value ?? ""}` : a.kind === "press" ? `press ${a.target ? `${a.target} ` : ""}${a.value ?? ""}` : `${a.kind} ${a.target}`;
+
+async function runUiNode(
+  node: FmlNode,
+  meta: Record<string, string>,
+  vars: Record<string, string>,
+  base: StepResult,
+  driver: UiDriver | undefined,
+  signal?: AbortSignal,
+): Promise<StepResult> {
+  if (!driver) {
+    return { ...base, skipped: "no browser to drive here — ui steps run from the CLI (node scripts/run.ts)" };
+  }
+
+  const plan = uiActions(node, meta, vars);
+  if (plan.error) return { ...base, ok: false, failedOn: "ui", error: plan.error };
+  if (plan.missing.length > 0) {
+    return {
+      ...base,
+      ok: false,
+      failedOn: "request",
+      error: `${node.id}: no value for ${plan.missing.map((n) => `{${n}}`).join(", ")} — declare it in @vars, capture it earlier, or supply it when you run`,
+    };
+  }
+
+  const started = Date.now();
+  const done: string[] = [];
+  for (const action of plan.actions) {
+    try {
+      await driver.perform(action, signal);
+      done.push(describe(action));
+    } catch (err) {
+      return {
+        ...base,
+        ok: false,
+        failedOn: "ui",
+        ui: { actions: done },
+        durationMs: Date.now() - started,
+        error: `${node.id}: ${describe(action)} failed — ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
+      };
+    }
+  }
+
+  // Page reads may hold {name}s too (`text([data-id={itemId}])`).
+  const read = (path: string) => driver.read(interpolate(path, vars).text);
+
+  const captures: CaptureResult[] = [];
+  for (const [name, path] of captureKeys(node)) {
+    const value = await read(path.trim());
+    captures.push({ name, path, value, ok: value !== undefined });
+    if (value !== undefined) vars[name] = value;
+  }
+  const asserts = await evaluateAsserts(node, read, vars);
+
+  let screenshot: string | undefined;
+  const shot = node.data.screenshot?.trim();
+  if (shot) {
+    const name = shot === "true" || shot === "yes" ? node.id : interpolate(shot, vars).text;
+    try {
+      screenshot = await driver.screenshot(name);
+    } catch {
+      // A screenshot is evidence, not the test — failing to save one never fails the step.
+    }
+  }
+
+  const failedCapture = captures.find((c) => !c.ok);
+  const failedAssert = asserts.find((a) => !a.ok);
+  let error: string | undefined;
+  let failedOn: StepResult["failedOn"];
+  if (failedCapture) {
+    error = `${node.id}: capture.${failedCapture.name} found nothing at "${failedCapture.path}"`;
+    failedOn = "capture";
+  } else if (failedAssert) {
+    error = `${node.id}: assert.${failedAssert.label} ${failedAssert.message}`;
+    failedOn = "assert";
+  }
+
+  return {
+    ...base,
+    captures,
+    asserts,
+    ui: { actions: done, ...(screenshot ? { screenshot } : {}) },
+    durationMs: Date.now() - started,
+    ok: !error,
+    ...(error ? { error } : {}),
+    ...(failedOn ? { failedOn } : {}),
+  };
+}
+
 // -- walking the flow -----------------------------------------------------
 
 export type StopReason =
@@ -497,6 +689,8 @@ export interface RunOptions {
   start?: string;
   /** Cycle guard — these graphs loop back on purpose. */
   maxSteps?: number;
+  /** Drives `ui` nodes. Absent: they're skipped (not failed) — see runUiNode. */
+  ui?: UiDriver;
   /**
    * Stop at the first failed step. Off by default: a status that has a drawn
    * edge is a *modelled* outcome — `-404>` exists to be walked — so the run
@@ -597,13 +791,15 @@ export async function runFlow(doc: FmlDoc, opts: RunOptions): Promise<RunResult>
     }
 
     await opts.onStepStart?.(current);
-    const step: StepResult = await runNode(current, doc.meta, vars, opts.transport, opts.signal);
+    const step: StepResult = await runNode(current, doc.meta, vars, opts.transport, opts.signal, opts.ui);
     steps.push(step);
     await opts.onStep?.(step);
 
     // No response means nothing to route on — an unbuildable request, a
-    // missing variable, a dead host. That always ends the walk.
-    if (!step.ok && (opts.stopOnFailure || (!step.passthrough && !step.response))) {
+    // missing variable, a dead host. That always ends the walk. So does a
+    // ui action that failed: the page is in an unknown state, and every
+    // step after it would fail for that reason, not its own.
+    if (!step.ok && (opts.stopOnFailure || step.failedOn === "request" || step.failedOn === "ui")) {
       stoppedBecause = "failed";
       break;
     }
@@ -661,9 +857,9 @@ export function requiredInputs(doc: FmlDoc): string[] {
   }
   const needed: string[] = [];
   for (const node of doc.nodes) {
-    // Only `api` nodes send anything, so only their `{name}`s are inputs a run
+    // Only `api` and `ui` nodes act, so only their `{name}`s are inputs a run
     // actually needs. A `{name}` sitting on a `page` node is documentation.
-    if (node.type !== "api") continue;
+    if (node.type !== "api" && node.type !== "ui") continue;
     for (const value of Object.values(node.data)) {
       for (const m of value.matchAll(VAR_RE)) {
         const name = m[1]!;

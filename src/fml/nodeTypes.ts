@@ -2,13 +2,14 @@
 //
 // A node's `type` is what makes a diagram *mean* something: it decides how the
 // node renders, what keys it is expected to carry, and — once flows execute —
-// what the runner does when it reaches that node. Five types cover an app flow:
+// what the runner does when it reaches that node. Six types cover an app flow:
 //
 //   page      something a person sees
 //   api       an HTTP request the app makes
 //   decision  a branch on a condition
 //   event     something that happens *to* the app (push, deep link, webhook)
 //   flow      a portal to another doc — the @fof / @doc drill-down
+//   ui        a step that drives a browser (FML-19) — open, fill, click, check
 //
 // Anything else still parses and still draws (grey, untyped) — it is a warning
 // in loose mode and an error in strict, never a hard stop. The vocabulary is a
@@ -90,6 +91,18 @@ export const NODE_TYPES: readonly FmlTypeSpec[] = [
     optional: ["source", "payload", "note"],
   },
   {
+    type: "ui",
+    label: "UI step",
+    plural: "UI steps",
+    summary: "Drives a browser: open, fill, click — then capture and assert what it shows.",
+    color: "var(--color-ui)",
+    // A sketch stays cheap: `Checkout = ui` is complete. `fill.<selector>`,
+    // `capture.<var>` and `assert.<path>` are prefixes — see EXEC_KEY_PREFIXES.
+    // Runs only where a UiDriver exists (the CLI) — see run.ts.
+    expects: [],
+    optional: ["open", "click", "press", "wait", "screenshot", "note"],
+  },
+  {
     type: "flow",
     label: "Flow",
     plural: "Flows",
@@ -118,7 +131,7 @@ export function isKnownType(type: string): boolean {
  * `query.page`, `capture.token` — so they can appear any number of times in one
  * block. `assert.<path>` scores the response body. Recognised here so tooling can tell a real key from a typo.
  */
-export const EXEC_KEY_PREFIXES = ["header", "query", "capture", "assert"] as const;
+export const EXEC_KEY_PREFIXES = ["header", "query", "capture", "assert", "fill"] as const;
 
 export function isExecKey(key: string): boolean {
   const dot = key.indexOf(".");
