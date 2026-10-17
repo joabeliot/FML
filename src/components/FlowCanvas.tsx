@@ -102,6 +102,18 @@ interface Props {
   onDataDrop?: (source: string, name: string, target: string, at: { x: number; y: number }, port?: string) => void;
 }
 
+/** The input port on `nodeId` within 24px of a screen point, if any — a near miss on an 8px dot still counts. */
+function nearestInputPort(nodeId: string, x: number, y: number): string | undefined {
+  const card = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`);
+  let best: { id: string; d: number } | undefined;
+  for (const h of card?.querySelectorAll<HTMLElement>('.react-flow__handle[data-handleid^="d-in-"]') ?? []) {
+    const r = h.getBoundingClientRect();
+    const d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y);
+    if (d <= 24 && (!best || d < best.d)) best = { id: h.dataset.handleid!, d };
+  }
+  return best?.id;
+}
+
 export function FlowCanvas({
   chartNodes,
   chartEdges,
@@ -383,8 +395,10 @@ export function FlowCanvas({
             if (target === from.nodeId || isVarNodeId(target)) return;
             // The port React Flow snapped to (it snaps within a radius, so the
             // pointer needn't be exactly on the dot), else whatever's under it.
-            const snapped = state.toHandle?.nodeId === target ? state.toHandle.id : undefined;
-            const portId = snapped ?? el?.closest<HTMLElement>(".react-flow__handle")?.dataset.handleid;
+            // (Only a data input counts: a control-flow handle can sit right
+            // beside a port, and snapping to it made the drop miss.)
+            const snapped = state.toHandle?.nodeId === target && state.toHandle.id?.startsWith("d-in-") ? state.toHandle.id : undefined;
+            const portId = snapped ?? nearestInputPort(target, point.clientX, point.clientY);
             const port = portId?.startsWith("d-in-") ? nameOfHandle(portId) : undefined;
             onDataDrop?.(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY }, port);
           } else if (!isVarNodeId(target)) {
