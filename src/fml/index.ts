@@ -38,7 +38,10 @@ export {
   startNode,
   statusMatches,
 } from "./run.ts";
+export { evaluateAssertion, parseAssertion } from "./assert.ts";
+export type { AssertOp, Assertion, AssertOutcome, ParsedAssertion } from "./assert.ts";
 export type {
+  AssertResult,
   BuiltRequest,
   CaptureResult,
   HttpRequest,

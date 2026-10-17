@@ -3,13 +3,15 @@
 // The parser answers "is this well-formed?". This answers "will this actually
 // do what it looks like it does?" — the class of mistake you'd otherwise only
 // find when a run fails at 2am: a typo'd `heder.Accept` that silently never
-// sends, a `path` with no `base` to hang off, an `expect: twohundred`.
+// sends, a `path` with no `base` to hang off, an `expect: twohundred`, an
+// `assert.rate: ~11900` with no tolerance.
 //
 // Issues are keyed by node id rather than line number, because that's what the
 // canvas and the property panel can act on — a node they can highlight.
 //
 // Zero dependencies, like the rest of `src/fml/`.
 
+import { parseAssertion } from "./assert.ts";
 import { EXEC_KEY_PREFIXES, isKnownType, nodeTypeSpec } from "./nodeTypes.ts";
 import { isStatusLabel } from "./run.ts";
 import type { FmlDoc } from "./types.ts";
@@ -164,6 +166,16 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
       if (key.startsWith("capture.") && value.trim() === "") {
         add(node.id, "warning", `${key} has no path — it will never capture anything`, key);
       }
+    }
+
+    // A malformed assertion can't do anything but fail — say why up front,
+    // rather than as a red step the first time the flow actually runs.
+    for (const [key, value] of Object.entries(data)) {
+      if (!key.startsWith("assert.")) continue;
+      const label = key.slice("assert.".length);
+      if (label.trim() === "") continue; // already flagged as "no name after the dot"
+      const parsed = parseAssertion(label, value);
+      if (!parsed.ok) add(node.id, "warning", `${key} ${parsed.error}`, key);
     }
 
   }

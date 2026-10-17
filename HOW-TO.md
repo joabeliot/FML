@@ -124,7 +124,7 @@ Each type has keys it is expected to carry, and keys that are merely useful:
 | type | expected | also understood |
 |---|---|---|
 | `page` | — | `route`, `title`, `image`, `note` |
-| `api` | `method`, `path` (or `url`) | `body`, `auth`, `expect`, `header.<Name>`, `query.<name>`, `capture.<var>`, `note` |
+| `api` | `method`, `path` (or `url`) | `base`, `body`, `auth`, `expect`, `header.<Name>`, `query.<name>`, `capture.<var>`, `assert.<path>`, `note` |
 | `decision` | — | `condition`, `note` |
 | `event` | — | `source`, `payload`, `note` |
 | `flow` | `doc` | `note` |
@@ -216,14 +216,17 @@ sends. See [Running a flow](#running-a-flow) below.
 
 - `path` resolves against `@meta base:` — or the node's own `base:`, see
   below; `url` is a full URL instead and ignores both.
-- `header.<Name>`, `query.<name>` and `capture.<var>` are **dotted keys** — the
-  suffix is the header/param/variable name, so each can appear any number of
-  times in one block.
+- `header.<Name>`, `query.<name>`, `capture.<var>` and `assert.<path>` are
+  **dotted keys** — the suffix is the header/param/variable name (or, for
+  `assert`, the path to check), so each can appear any number of times in one
+  block.
 - `{name}` is a **variable reference**. `capture.token: $.data.token` pulls a
   value out of one response so a later node can spend it as `{token}`.
 - `auth:` is sugar over the Authorization header — `none` sends nothing,
   `bearer {token}` sends `Bearer <value>`, anything else is sent literally.
 - `expect:` is the status assertion — `200`, `200,201`, `2xx`, or `200-204`.
+- `assert.<path>:` checks the response *body* — see
+  [Body assertions](#body-assertions--assertpath) below.
 
 `{name}` is also resolved *statically*: click a node and its **About** tab lists
 every variable it references and where the value comes from. See below.
@@ -271,6 +274,58 @@ resolves against the doc-level `base`, or its own override if it has one:
   on a failure, which is usually a host mismatch, not a broken request. See
   `examples/multi-host.fml`.
 
+### Body assertions — `assert.<path>`
+
+`expect` only checks the status. A 200 with the wrong number in the body still
+passes it — FML confirmed the API answered, not that it said the right thing.
+`assert.<path>` reads a value out of the response and compares it:
+
+```
+@node income {
+  method: GET
+  path: /income
+  capture.rate: $.data.income_rate
+  expect: 200
+  assert.data.income_rate: ~11900+-50     # within 50 either way
+  assert.sources.length: >= 2             # .length on an array
+  assert.data.status: active              # exact match
+  assert.data.error: absent
+  assert.first: $.items[0].id == {firstId}
+}
+```
+
+**The suffix is the path**, in the same syntax `capture` reads (see the table
+under [Running a flow](#running-a-flow)): `data.income_rate`, `status`,
+`header.ETag`. Keys can't contain `$`, `[` or `]`, so when you need an array
+index or the body's root, **start the value with a `$` path** — the first word
+is then the path, and the suffix is just a label for messages:
+`assert.first: $.items[0].id == a`. Use `$.` too for a body field literally
+named `status` or `header`, which would otherwise read the HTTP status or a
+header.
+
+| comparison | passes when |
+|---|---|
+| `active` or `== active` | exact — compared as numbers when both sides are numbers (`7` equals `7.0`) |
+| `"7"` | quoted: an exact *string* match (also the escape for a value that starts with `>` or `~`) |
+| `!= x` | not equal, same rules as exact |
+| `>= 2`, `<= 2`, `> 2`, `< 2` | numeric comparison |
+| `~11900+-50` | within an absolute tolerance |
+| `~11900+-1%` | within a relative tolerance |
+| `matches ^W/"` | the value matches a JavaScript regular expression |
+| `exists` / `absent` | the path leads somewhere / nowhere |
+
+There's **no default tolerance**: a bare `~11900` is a lint warning and fails
+the step. A hidden 1% is exactly what you forget about when a test goes red.
+
+`{name}` works on the right-hand side — including a value this same node just
+captured, because captures run first, then `expect`, then asserts.
+
+**A failed assert behaves exactly like a failed `expect`.** The step and the
+run go red, but the walk still follows the drawn edge so you see the rest of
+the path; `--fail-fast` stops at it instead. The step log prints every assert
+with ✔/✖ and what actually came back. See `examples/assertions.fml`, which
+fails on purpose.
+
 ### Running a flow
 
 ```bash
@@ -308,6 +363,7 @@ cared about — two different reasons for that:
 | `$` | the whole body, verbatim |
 | `status` | the status code |
 | `header.<Name>` | a response header, case-insensitive |
+| `$.items.length` | an array's length (only as the last segment) |
 
 A capture that finds nothing **fails the step** — a silently-empty `{token}`
 is the worst outcome a test run can have.
@@ -344,6 +400,7 @@ mistakes that only bite once you actually run something:
 - `path` with no `base` (on the node or `@meta`) to resolve against
 - a method that isn't an HTTP verb, an `expect` that isn't a status pattern
 - `capture.x:` with no path — it would never capture anything
+- a malformed `assert` — `~N` with no tolerance, `>= lots`, a bad regex
 - `{name}`s that are run-time inputs (shown with `--all`)
 
 Note what is deliberately *not* flagged: `expect: 200` on a node that also
@@ -657,7 +714,10 @@ per journey, assembled at the top of the entry file:
   warning, though — that's the typo catcher (`heder.Accept` never sending is
   a worse surprise than a warning).
 - **Key charset is `[A-Za-z0-9_.-]`.** The `.` is what makes `header.Accept`,
-  `query.page` and `capture.token` work.
+  `query.page` and `capture.token` work. It's also why `assert` takes a `$`
+  path in its *value* for anything with `[0]` in it.
+- **`#` starts a comment, even inside a value** — so a `matches` pattern can't
+  contain one yet.
 - **Blank lines are ignored today.** Use them to visually group related flows;
   a future version will treat a blank line as a boundary between separate
   diagrams, so organising with them now is future-proof.

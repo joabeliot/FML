@@ -16,6 +16,7 @@
 //
 // See lore/ideas/flow-execution.md for the key vocabulary this implements.
 
+import { evaluateAssertion, parseAssertion } from "./assert.ts";
 import type { FmlDoc, FmlEdge, FmlNode } from "./types.ts";
 
 // -- transport ------------------------------------------------------------
@@ -91,6 +92,9 @@ function asText(value: unknown): string | undefined {
  *   `$`              the whole body, verbatim
  *   `status`         the status code
  *   `header.<Name>`  a response header, case-insensitive
+ *   `….length`       as the last segment on an array, its length — so
+ *                    `assert.sources.length: >= 2` works. Only there: on an
+ *                    object, `length` is still just a key.
  *
  * Returns undefined when the path doesn't lead anywhere — the caller reports
  * that as a failed capture rather than storing an empty string, because a
@@ -117,9 +121,11 @@ export function readPath(res: HttpResponse, path: string): string | undefined {
     return undefined;
   }
 
-  for (const token of pathTokens(expr)) {
+  const tokens = pathTokens(expr);
+  for (const [at, token] of tokens.entries()) {
     if (cursor === null || cursor === undefined) return undefined;
     if (Array.isArray(cursor)) {
+      if (token === "length" && at === tokens.length - 1) return String(cursor.length);
       const i = Number(token);
       if (!Number.isInteger(i)) return undefined;
       cursor = cursor[i < 0 ? cursor.length + i : i];
@@ -262,6 +268,20 @@ export interface CaptureResult {
   ok: boolean;
 }
 
+export interface AssertResult {
+  /** The key suffix, `assert.<label>`. */
+  label: string;
+  /** The path actually read — the suffix, or a `$…` the value named. */
+  path: string;
+  /** The comparison as written, after the colon. */
+  expr: string;
+  /** What the path resolved to; absent when it led nowhere. */
+  actual?: string;
+  ok: boolean;
+  /** Why it failed — malformed expression, nothing at the path, or a mismatch. */
+  message?: string;
+}
+
 export interface StepResult {
   nodeId: string;
   type: string;
@@ -270,6 +290,8 @@ export interface StepResult {
   request?: HttpRequest;
   response?: HttpResponse;
   captures: CaptureResult[];
+  /** Every `assert.<path>` on the node, evaluated after captures and `expect`. */
+  asserts: AssertResult[];
   /** The node's `expect` pattern, when it declared one. */
   expect?: string;
   ok: boolean;
@@ -284,12 +306,53 @@ function captureKeys(node: FmlNode): Array<[string, string]> {
     .map(([k, v]) => [k.slice("capture.".length), v]);
 }
 
+/** Every `assert.<label>` on a node, in declaration order. */
+function assertKeys(node: FmlNode): Array<[string, string]> {
+  return Object.entries(node.data)
+    .filter(([k]) => k.startsWith("assert."))
+    .map(([k, v]) => [k.slice("assert.".length), v]);
+}
+
+/**
+ * Score a response against the node's `assert.*` keys. Runs after captures,
+ * so an operand can name a `{value}` this very node just pulled out.
+ */
+function evaluateAsserts(node: FmlNode, response: HttpResponse, vars: Record<string, string>): AssertResult[] {
+  const out: AssertResult[] = [];
+  for (const [label, value] of assertKeys(node)) {
+    const expr = value.trim();
+    const parsed = parseAssertion(label, value);
+    if (!parsed.ok) {
+      out.push({ label, path: label, expr, ok: false, message: parsed.error });
+      continue;
+    }
+    const a = parsed.assertion;
+    const actual = readPath(response, a.path);
+    const { text: operand, missing } = interpolate(a.operand, vars);
+    const outcome =
+      missing.length > 0
+        ? { ok: false, message: `no value for ${missing.map((n) => `{${n}}`).join(", ")}` }
+        : evaluateAssertion(a, actual, operand);
+    out.push({
+      label,
+      path: a.path,
+      expr,
+      ...(actual === undefined ? {} : { actual }),
+      ok: outcome.ok,
+      ...(outcome.message ? { message: outcome.message } : {}),
+    });
+  }
+  return out;
+}
+
 /**
  * Send one `api` node and fold its captures into `vars` (mutated in place, so
  * the next node in the same run sees them — that threading *is* the feature).
  *
  * Captures run before the `expect` assertion, so a failing step still tells
- * you what came back instead of throwing the response away.
+ * you what came back instead of throwing the response away. `assert.*` keys
+ * run last and score the step exactly like `expect` does — red, but the walk
+ * still follows the drawn edge (`stopOnFailure` is the fail-fast override).
  */
 export async function runNode(
   node: FmlNode,
@@ -298,7 +361,14 @@ export async function runNode(
   transport: Transport,
   signal?: AbortSignal,
 ): Promise<StepResult> {
-  const base: StepResult = { nodeId: node.id, type: node.type, passthrough: false, captures: [], ok: true };
+  const base: StepResult = {
+    nodeId: node.id,
+    type: node.type,
+    passthrough: false,
+    captures: [],
+    asserts: [],
+    ok: true,
+  };
 
   if (node.type !== "api") return { ...base, passthrough: true };
 
@@ -338,16 +408,20 @@ export async function runNode(
   const expect = node.data.expect?.trim();
   const statusOk = !expect || statusMatches(expect, response.status);
   const failedCapture = captures.find((c) => !c.ok);
+  const asserts = evaluateAsserts(node, response, vars);
+  const failedAssert = asserts.find((a) => !a.ok);
 
   let error: string | undefined;
   if (!statusOk) error = `${node.id}: expected ${expect}, got ${response.status}`;
   else if (failedCapture) error = `${node.id}: capture.${failedCapture.name} found nothing at "${failedCapture.path}"`;
+  else if (failedAssert) error = `${node.id}: assert.${failedAssert.label} ${failedAssert.message}`;
 
   return {
     ...base,
     request,
     response,
     captures,
+    asserts,
     ...(expect ? { expect } : {}),
     durationMs,
     ok: !error,

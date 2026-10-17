@@ -58,6 +58,7 @@ The `api` node's key set has to carry enough to actually send the request:
 | `auth` | `none` / `bearer {token}` / … |
 | `capture.<var>` | pull a value from the response into a variable (JSONPath) |
 | `expect` | status assertion for the run — `200`, `200,201` |
+| `assert.<path>` | body assertion — `== x`, `>= N`, `~N+-T`, `matches`, `exists`/`absent` — DONE (2026-10-17, FML-11/12) |
 
 `decision` conditions become expressions over variables (`{status} == 200`).
 An `event` node can seed the run's starting variables.
@@ -82,16 +83,20 @@ An `event` node can seed the run's starting variables.
 4. Browser runner — DONE (2026-09-05/08). Dev-proxy transport, per-step
    pass/fail + camera-follow on the canvas (`src/hooks/useFlowRun.ts`,
    `src/components/RunBar.tsx`).
-5. **Body assertions — ticket PAQ-11, not started.** `expect` only checks
-   status; a 200 with the wrong number in the body still scores green. Raised
+5. **Body assertions — DONE (2026-10-17, FML-11).** `expect` only checks
+   status; a 200 with the wrong number in the body still scored green. Raised
    2026-10-09 by a Claude session testing stablishMind's income calc end to
    end: "without that, FML tests are smoke tests not correctness tests."
-   `assert.<name>: <expr>` on `api` nodes, same shape as `capture.<var>`. See
-   the ticket for the comparison grammar and the full ripple. Two things it
-   deliberately does NOT cover, both separate follow-ups: routing on a
-   captured/asserted value (today only status picks a branch — see the
-   `decision` line below), and test-data seeding (FML has no backend-state
-   concept by design; probably stays Django's job, not FML's).
+   `assert.<path>: <comparison>` on `api` nodes (`src/fml/assert.ts`). The key
+   suffix is the path; a value starting with `$` names its own path instead,
+   because keys can't spell `[0]`. Tolerance is explicit — `~N+-T` or
+   `~N+-T%`; a bare `~N` is rejected rather than given a hidden default.
+   Captures → `expect` → asserts, in that order; a failed assert scores red
+   and still walks the edge, like `expect`. Two things it deliberately does
+   NOT cover, both separate follow-ups: routing on a captured/asserted value
+   (today only status picks a branch — see the `decision` line below), and
+   test-data seeding (FML has no backend-state concept by design; probably
+   stays Django's job, not FML's).
 
 ### Resolved: `expect` vs. a drawn status edge
 

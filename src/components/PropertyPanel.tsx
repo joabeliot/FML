@@ -611,6 +611,26 @@ function RunView({ step }: { step: StepResult }) {
         </section>
       )}
 
+      {step.asserts.length > 0 && (
+        <section>
+          <div className={keyLabel}>asserted</div>
+          <div className="mt-1 flex flex-col gap-1">
+            {step.asserts.map((a) => (
+              <div key={a.label} className="flex gap-2 font-mono text-[11px]">
+                <span className="shrink-0 text-ink-dim">{a.label}</span>
+                <span
+                  className="min-w-0 flex-1 truncate"
+                  style={{ color: a.ok ? "var(--color-ink)" : "var(--color-danger)" }}
+                  title={a.ok ? `${a.expr} — got ${a.actual ?? "nothing"}` : `${a.expr} — ${a.message ?? "failed"}`}
+                >
+                  {a.ok ? `✔ ${a.expr}` : `✖ ${a.message ?? a.expr}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {step.request && (
         <section>
           <div className={keyLabel}>request</div>

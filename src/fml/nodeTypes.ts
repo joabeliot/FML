@@ -116,9 +116,9 @@ export function isKnownType(type: string): boolean {
 /**
  * Repeatable execution keys are written with a dotted suffix — `header.Accept`,
  * `query.page`, `capture.token` — so they can appear any number of times in one
- * block. Recognised here so tooling can tell a real key from a typo.
+ * block. `assert.<path>` scores the response body. Recognised here so tooling can tell a real key from a typo.
  */
-export const EXEC_KEY_PREFIXES = ["header", "query", "capture"] as const;
+export const EXEC_KEY_PREFIXES = ["header", "query", "capture", "assert"] as const;
 
 export function isExecKey(key: string): boolean {
   const dot = key.indexOf(".");

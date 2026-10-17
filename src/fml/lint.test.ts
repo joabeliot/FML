@@ -104,9 +104,22 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
   eq("drawing the error branch is never flagged", issues, []);
 }
 
+// 5b. malformed assertions are caught before a run
+{
+  const issues = lintOf(
+    `@meta\n  base: https://a.test\n@nodes\n  a = api\n@node a {\n  path: /x\n  assert.rate: ~11900\n  assert.n: >= lots\n  assert.: 1\n  assert.ok: >= 2\n  assert.tag: matches (\n}\n`,
+  );
+  ok("~ with no tolerance flagged", has(issues, "a", "assert.rate"));
+  ok("numeric op with a word flagged", has(issues, "a", "assert.n"));
+  ok("empty path flagged", has(issues, "a", "no name after the dot"));
+  ok("bad regex flagged", has(issues, "a", "assert.tag"));
+  ok("a good assert is silent", !issues.some((i) => i.key === "assert.ok"));
+  ok("assert is a known prefix", !has(issues, "a", "isn't part of the api standard"));
+}
+
 // 6. every shipped example lints clean
 {
-  const clean = ["examples/run.fml"];
+  const clean = ["examples/run.fml", "examples/assertions.fml"];
   for (const file of clean) {
     // Read through parse so @meta/@vars are real; no @fof in these.
     const src = await import("node:fs").then((fs) => fs.readFileSync(file, "utf8"));

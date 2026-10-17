@@ -127,6 +127,7 @@ function printPlan(): void {
     if (req.body) console.log(`        body ${req.body}`);
     for (const [k, v] of Object.entries(node.data)) {
       if (k.startsWith("capture.")) console.log(`        capture ${k.slice(8)} ← ${v}`);
+      else if (k.startsWith("assert.")) console.log(`        assert ${k.slice(7)}: ${v}`);
     }
     if (built.missing.length > 0) {
       // Not an error here: these are captured mid-run, so they're unknowable
@@ -153,6 +154,13 @@ function line(step: StepResult): void {
       c.ok
         ? `        capture ${c.name} = ${mask(c.name, c.value ?? "")}`
         : `        capture ${c.name} ✖ nothing at "${c.path}"`,
+    );
+  }
+  for (const a of step.asserts) {
+    console.log(
+      a.ok
+        ? `        assert ${a.label} ✔ ${a.expr}`
+        : `        assert ${a.label} ✖ ${a.expr} — ${a.message ?? "failed"}`,
     );
   }
   if (step.error) console.log(`        ${step.error}`);
