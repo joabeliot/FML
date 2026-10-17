@@ -36,6 +36,15 @@ Each one writes a small edit straight into the `.fml` text.
 - **Positions:** a rename carries the dragged position over to the new id
   (`renamePosition`).
 
+## Drop on the card, not the dot
+
+React Flow only completes a connection within ~20px of a handle, so a drop
+on the body of the target card silently did nothing (the e2e suite caught
+this as a zoom-dependent flake). `FlowCanvas`'s `onConnectEnd` now treats
+the whole card under the pointer as the target, for control edges and data
+wires alike. A drop exactly on a handle still goes through `onConnect` once
+(`state.isValid` guards against making two edges).
+
 ## Not done / open
 
 - The ops are written against FML's grammar. RML (FML-21) will need its own

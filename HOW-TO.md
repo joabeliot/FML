@@ -106,7 +106,7 @@ LoginScreen = page   # also a comment (after whitespace)
 - **type** — one of the five standard types below.
 - Every box referenced in `@flow` must be declared here, or the parser errors.
 
-### The five node types
+### The six node types
 
 The type is what makes a diagram mean something rather than just look like
 something. Pick from this vocabulary:
@@ -118,6 +118,7 @@ something. Pick from this vocabulary:
 | `decision` | a branch — the outgoing arrows are the answers | amber | a fork |
 | `event` | something that happens *to* the app: cold start, push, deep link, webhook | pink | a burst |
 | `flow` | a portal standing for another doc (`@doc` / `@fof`) | violet | a doorway |
+| `ui` | a step that drives a browser: open, fill, click, then check the page | cyan | a pointer |
 
 Each type has keys it is expected to carry, and keys that are merely useful:
 
@@ -128,6 +129,7 @@ Each type has keys it is expected to carry, and keys that are merely useful:
 | `decision` | — | `condition`, `note` |
 | `event` | — | `source`, `payload`, `note` |
 | `flow` | `doc` | `note` |
+| `ui` | — | `open`, `fill.<field>`, `click`, `press`, `wait`, `capture.<var>`, `assert.<path>`, `screenshot`, `note` |
 
 Only the keys in **expected** are checked, because only those stop the node from
 doing its job: an `api` that names no request can't be sent, a `flow` portal
@@ -537,6 +539,120 @@ mistakes that only bite once you actually run something:
 Note what is deliberately *not* flagged: `expect: 200` on a node that also
 draws `-404>`. That pairing is the idiom, not a contradiction.
 
+### Checking flows against the API's spec — drift
+
+A flow can describe an endpoint the API never had, or one that changed after
+the flow was written. If the API publishes an OpenAPI (3.x) or Swagger (2.0)
+spec, compare the two:
+
+```bash
+npm run drift -- examples/conditional-get.fml openapi.json
+npm run drift -- app.fml openapi.yaml --coverage   # also list untested operations
+npm run drift -- app.fml openapi.yaml --json       # machine-readable
+```
+
+Every `api` node, including ones in `@fof` imports and in every `@doc`, is
+matched by method and path. `{param}` segments match anything on either side,
+and the spec's `basePath` / `servers` prefix and your `base` path prefix are
+both taken into account.
+
+| finding | severity | means |
+|---|---|---|
+| no path in the spec matches | error | the endpoint doesn't exist — the flow is wrong or the API moved |
+| path exists, method doesn't | error | e.g. the flow `PUT`s what the spec only `GET`s |
+| status not documented | warning | the flow `expect`s or draws a `-404>` the spec never lists |
+| no path or url | warning | nothing to compare |
+
+The command exits 1 only when there are errors, so it can run in CI. Warnings
+are often the spec being incomplete rather than the flow being wrong. For
+example, httpbin's own spec doesn't list the `304` that
+`examples/conditional-get.fml` depends on. If the spec names a host, nodes
+calling a *different* host (a multi-host flow) are skipped and counted, not
+flagged. A host built from a `{var}` can't be ruled out, so it's checked.
+
+The spec has to be a local file in JSON or YAML. Download it first; the
+command doesn't fetch URLs.
+
+### UI steps: driving a browser inside a flow
+
+An API flow stops at the API. A lot of bugs only show up when someone uses
+the real UI, so a `ui` node opens a page, types, clicks, and checks what the
+page shows. Values move between `api` and `ui` nodes the same way they move
+between two API calls:
+
+```
+@meta
+  base: https://api.example.com
+  ui_base: https://app.example.com     # relative `open:` paths join onto this
+
+@node createItem {
+  method: POST
+  path: /items
+  body: {"name": "Spring sale"}
+  capture.itemId: $.id
+  expect: 201
+}
+
+@node openItem {
+  open: /items/{itemId}
+  wait: [data-testid=item-title]
+  assert.title: text([data-testid=item-title]) == Spring sale
+  capture.status: text([data-testid=status])
+  screenshot: item-page
+}
+
+@node publish {
+  click: button.publish
+  wait: [data-testid=toast]
+  assert.toast: text([data-testid=toast]) matches ^Published
+  assert.url: matches /items/{itemId}$
+}
+```
+
+A `ui` node always does things in this order: `open` → `fill.<field>` (in
+the order written) → `click` → `press` → `wait`. Then it runs its captures
+and asserts, then takes its `screenshot`. One node can't click twice,
+because a block's keys are a map; a longer journey is a chain of `ui` nodes,
+which is how it reads on the canvas anyway.
+
+| key | does |
+|---|---|
+| `open` | go to a URL (absolute, or relative to `@meta ui_base`) |
+| `fill.<field>` | type into the field whose `name`, `id` or `data-testid` is `<field>`; start the value with `sel(<css>)` to target any other element: `fill.q: sel(.search input) {term}` |
+| `click` | click the first element matching a CSS selector |
+| `press` | press a key: `press: Enter` (focused element) or `press: input[name=q] Enter` |
+| `wait` | wait until a selector is visible |
+| `screenshot` | save a full-page PNG under that name (`true` uses the node id) |
+
+**Reading the page**, for `capture` and `assert`: `text(sel)`, `value(sel)`,
+`count(sel)`, `visible(sel)`, `attr(sel, name)`, plus `url` and `title`. A
+key can't hold a CSS selector, so put the read at the start of the value:
+`assert.heading: text(h1) == Welcome`. For `url` and `title` the key suffix
+is the path, the same as `assert.status`: `assert.url: matches /done$`.
+
+**Where they run:** from the CLI, with Playwright driving Chrome. It uses
+Playwright's bundled Chromium if you've run `npx playwright install
+chromium`; otherwise it uses your installed Google Chrome. Set
+`FML_UI_BROWSER=chrome|chromium` to force one.
+
+```bash
+node scripts/run.ts examples/ui.fml                    # headless
+node scripts/run.ts examples/ui.fml --headed           # watch it
+node scripts/run.ts examples/ui.fml --artifacts out    # screenshots → ./out (default ./fml-artifacts)
+```
+
+The in-app **▶ Run** can't drive a browser from inside a page, so it shows
+`ui` steps as **skipped** (–), never as passed or failed. If a `ui` action
+fails (an element never appears, say) the walk stops, because the page is in
+an unknown state and everything after would fail for that reason rather than
+its own. A failed capture or assert scores the step red and the walk carries
+on, the same as for `api`. `--json` reports each `ui` step's actions and
+screenshot path.
+
+`#` starts a comment after a space, so write `[id=submit]` rather than
+` #submit` in a selector. (`button#submit`, with no space before `#`, is
+fine.)
+
 ### Running a flow from the app
 
 The canvas has a **▶ Run** button (only enabled when the active doc has an
@@ -751,6 +867,53 @@ per journey, assembled at the top of the entry file:
 
 ---
 
+## RML — roadmaps
+
+`.rml` files map a *project* instead of a flow. They use the same grammar as
+FML, with different node types and a different meaning for arrows:
+
+```
+@nodes
+  auth     = feature
+  billing  = feature
+  launch   = milestone
+
+@node auth {
+  status: done
+  area: platform
+  description: Sign-in, sessions, password reset
+  fml: auth
+  ticket: FML-11, FML-12
+}
+
+@flow
+  auth -> launch        # launch depends on auth
+  billing -> launch     # …and on billing
+```
+
+| key | meaning |
+|---|---|
+| `status` | `pending` (default), `active` or `done`; you set it by hand |
+| `area` | a category; nodes in the same area share a colour |
+| `description` | shown on hover and in the side panel |
+| `fml` | the `.fml` that proves it; opens in the flow view if it's loaded |
+| `ticket` | lore ticket ids, comma-separated, shown as references |
+
+Switch to **Roadmap** at the top of the canvas, then open a `.rml` file (or
+load the example, `examples/roadmap.rml`, which is F*ML's own roadmap).
+
+- **Done** tiles are lit in their area's colour, and **active** ones are lit
+  with a gold ring.
+- A pending tile whose dependencies are all done is **ready**: dark, with a
+  coloured outline and a `NEXT` tag. That's your frontier.
+- Everything else is **locked**.
+- Connectors turn gold once their prerequisite is done.
+- Click a tile to change its status (written straight into the file, ⌘Z to
+  undo) and to follow its flows, tickets, and what it depends on and unlocks.
+
+The footer flags a status outside the three, a key RML doesn't know, and
+dependency cycles.
+
 ## Modelling an app
 
 | App concept | FML |
@@ -940,6 +1103,19 @@ What the viewer gives you beyond the picture:
     node also removes its `@node` block, every arrow into or out of it, and
     any group it leaves empty, so nothing is left dangling.
   - **⌘Z / Ctrl+Z** undoes the last of these edits.
+- **See where values flow (data wires).** Each `capture.<name>` is an output
+  port on the right of its card, and each `{name}` a node uses is an input
+  port on the left. A dashed orange wire joins the node that captures a value
+  to every node that uses it. Selecting a node shows its wires; the **Data**
+  toolbar button shows them all. Input ports also show where the value comes
+  from:
+  - **filled:** captured by a node
+  - **hollow:** an `@vars` default
+  - **hollow red:** a run-time input you'll be asked for
+- **Wire a value by dragging.** Drag from an output port and drop it anywhere
+  on another card. Then pick where `{name}` should go: appended to one of the
+  card's fields, `auth: bearer {name}`, `query.<name>`, or a new key you type.
+  It's the same text you'd have typed yourself. ⌘Z undoes it.
 - **Double-click a `flow` node** to drill into the doc its `doc:` key names.
 - **Click a step badge** (top-right of a card) to spotlight that node's
   immediate `prev` / `next` neighbours and dim the rest.

@@ -13,6 +13,8 @@ import {
 import { FmlNode } from "./nodes/FmlNode.tsx";
 import { BubbleNode } from "./nodes/BubbleNode.tsx";
 import { FlowEdge } from "./edges/FlowEdge.tsx";
+import { DataEdge } from "./edges/DataEdge.tsx";
+import { isDataHandle, nameOfHandle } from "../lib/dataWires.ts";
 import { useForceLayout } from "../hooks/useForceLayout.ts";
 import { nodeSize } from "../lib/layout.ts";
 import { savePositions } from "../lib/nodePositions.ts";
@@ -24,7 +26,7 @@ const nodeTypes = { fml: FmlNode, bubble: BubbleNode };
 
 /** Ceiling on how close the run camera gets — comfortable reading distance. */
 const FOLLOW_ZOOM = 1.15;
-const edgeTypes = { flow: FlowEdge };
+const edgeTypes = { flow: FlowEdge, data: DataEdge };
 
 /**
  * Space the floating chrome (toolbar, side panels) takes off the viewport, as a
@@ -88,6 +90,11 @@ interface Props {
    * (mid-run) means connecting is off.
    */
   onConnect?: (source: string, target: string) => void;
+  /**
+   * A data wire was dragged from `source`'s `capture.<name>` port and dropped
+   * on `target` (anywhere on its card) at screen point `at` — FML-20.
+   */
+  onDataDrop?: (source: string, name: string, target: string, at: { x: number; y: number }) => void;
 }
 
 export function FlowCanvas({
@@ -104,6 +111,7 @@ export function FlowCanvas({
   runActive,
   padding,
   onConnect,
+  onDataDrop,
 }: Props) {
   const { fitView, getNodes } = useReactFlow();
   const initialized = useNodesInitialized();
@@ -342,8 +350,34 @@ export function FlowCanvas({
         // thing that does an initial fit now.
         nodesDraggable
         nodesConnectable={!!onConnect}
+        // Control flow and data wires are two layers: a drag that starts on
+        // one kind of handle can never complete on the other. Data drags
+        // never complete through React Flow at all — they're resolved on
+        // drop (onConnectEnd), because you drop a value onto a *card*, not
+        // onto a port that doesn't exist yet.
+        isValidConnection={(c) => !isDataHandle(c.sourceHandle) && !isDataHandle(c.targetHandle)}
         onConnect={(c) => {
+          if (isDataHandle(c.sourceHandle) || isDataHandle(c.targetHandle)) return;
           if (c.source && c.target) onConnect?.(c.source, c.target);
+        }}
+        onConnectEnd={(event, state) => {
+          // A completed handle-to-handle connection already went through onConnect.
+          if (state.isValid) return;
+          const from = state.fromHandle;
+          if (!from || from.type !== "source") return;
+          const point = "changedTouches" in event ? event.changedTouches[0] : event;
+          if (!point) return;
+          // Dropped on a card rather than exactly on its handle: React Flow
+          // only connects within ~20px of a handle, so a drop on the card's
+          // body silently did nothing. Treat the whole card as the target.
+          const el = document.elementFromPoint(point.clientX, point.clientY);
+          const target = el?.closest<HTMLElement>(".react-flow__node")?.dataset.id;
+          if (!target) return;
+          if (isDataHandle(from.id)) {
+            if (target !== from.nodeId) onDataDrop?.(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY });
+          } else {
+            onConnect?.(from.nodeId, target);
+          }
         }}
         // Deleting goes through the .fml (App's key handler), never React
         // Flow's local state — a node removed only on the canvas reappears on

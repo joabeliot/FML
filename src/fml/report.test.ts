@@ -99,7 +99,7 @@ const supplied = { password: "hunter2-very-secret", apiKey: "k-123456" };
 
   eq("schema version", report.schema, 1);
   eq("red", report.ok, false);
-  eq("summary", report.summary, { steps: 3, requests: 2, passed: 1, failed: 1 });
+  eq("summary", report.summary, { steps: 3, requests: 2, passed: 1, failed: 1, skipped: 0 });
   eq("failure points at the node", report.failure?.nodeId, "me");
   eq("and says it was an assert", report.failure?.kind, "assert");
   eq("with the assertion that failed", report.failure?.assertion?.label, "plan");

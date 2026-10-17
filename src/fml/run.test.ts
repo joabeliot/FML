@@ -15,9 +15,12 @@ import {
   runFlow,
   runNode,
   statusMatches,
+  uiActions,
   type HttpRequest,
   type HttpResponse,
   type Transport,
+  type UiAction,
+  type UiDriver,
 } from "./run.ts";
 
 let passed = 0;
@@ -245,6 +248,10 @@ function fakeTransport(
   ok("$ path with nothing after", op("x", "$.a").includes("nothing to compare"));
   ok("bad regex", op("x", "matches (").includes("bad pattern"));
   ok("{name} operand is not number-checked", typeof parsed("n", ">= {min}") !== "string");
+  eq("a page read names its own path (ui)", op("t", "text(h1) == Welcome"), "text(h1) eq Welcome");
+  eq("selectors may nest parens and quotes", op("t", 'text([data-x="a(b)"]) matches ^x'), 'text([data-x="a(b)"]) matches ^x');
+  eq("count() with a numeric op", op("n", "count(li.item) >= 3"), "count(li.item) ge 3");
+  ok("a page read needs something to compare", op("t", "text(h1)").includes("nothing to compare"));
 
   const check = (value: string, actual: string | undefined, operand?: string): boolean => {
     const p = parseAssertion("x", value);
@@ -485,6 +492,106 @@ function fakeTransport(
     fakeTransport([{ status: 416 }]).transport,
   );
   ok("416 for a range past the end", outOfRange.ok, outOfRange.error);
+}
+
+// 5g. ui steps (FML-19) — a fake driver, so no browser is involved --------
+{
+  /** Records every action; reads come from a fixed "page". */
+  const fakeUi = (page: Record<string, string>, failOn?: string): { driver: UiDriver; did: UiAction[]; shots: string[] } => {
+    const did: UiAction[] = [];
+    const shots: string[] = [];
+    const driver: UiDriver = {
+      async perform(a) {
+        if (failOn && a.target.includes(failOn)) throw new Error(`no element matches ${a.target}`);
+        did.push(a);
+      },
+      async read(path) {
+        return page[path];
+      },
+      async screenshot(name) {
+        shots.push(name);
+        return `/artifacts/${name}.png`;
+      },
+    };
+    return { driver, did, shots };
+  };
+
+  const node = {
+    id: "checkout",
+    type: "ui",
+    data: {
+      wait: "[data-testid=done]",
+      click: "button.pay",
+      "fill.email": "{email}",
+      "fill.card": "sel(.stripe input) 4242",
+      open: "/checkout/{cartId}",
+      press: "Enter",
+      "capture.orderId": "text([data-testid=order])",
+      "assert.total": "text(.total) == $42.00",
+      "assert.url": "matches /done$",
+      screenshot: "paid",
+    },
+  };
+  const meta = { ui_base: "https://shop.test" };
+
+  const plan = uiActions(node, meta, { email: "a@b.c", cartId: "c9" });
+  eq(
+    "actions run in one fixed order, whatever order the keys are written in",
+    plan.actions.map((a) => a.kind),
+    ["open", "fill", "fill", "click", "press", "wait"],
+  );
+  eq("open is joined onto ui_base and interpolated", plan.actions[0]?.target, "https://shop.test/checkout/c9");
+  eq("fill.<field> finds the field by name, id or test id", plan.actions[1]?.target, '[name="email"], [id="email"], [data-testid="email"]');
+  eq("and types the interpolated value", plan.actions[1]?.value, "a@b.c");
+  eq("sel(…) targets any CSS selector", [plan.actions[2]?.target, plan.actions[2]?.value], [".stripe input", "4242"]);
+  eq("a bare press key goes to the focused element", [plan.actions[4]?.target, plan.actions[4]?.value], ["", "Enter"]);
+
+  const page = { "text([data-testid=order])": "ord_77", "text(.total)": "$42.00", url: "https://shop.test/done" };
+  const ok1 = fakeUi(page);
+  const vars: Record<string, string> = { email: "a@b.c", cartId: "c9" };
+  const step = await runNode(node, meta, vars, fakeTransport([{}]).transport, undefined, ok1.driver);
+  ok("a ui step passes when its asserts do", step.ok, step.error);
+  eq("it captured off the page into the run's variables", vars.orderId, "ord_77");
+  eq("and took its screenshot", [ok1.shots, step.ui?.screenshot], [["paid"], "/artifacts/paid.png"]);
+  eq("its actions are reported", step.ui?.actions.length, 6);
+  ok("a ui step is not a passthrough", !step.passthrough);
+
+  const wrong = await runNode(node, meta, { ...vars }, fakeTransport([{}]).transport, undefined, fakeUi({ ...page, "text(.total)": "$40.00" }).driver);
+  ok("a wrong total on the page fails the step", !wrong.ok);
+  eq("as an assert failure", wrong.failedOn, "assert");
+
+  const broken = await runNode(node, meta, { ...vars }, fakeTransport([{}]).transport, undefined, fakeUi(page, "button.pay").driver);
+  eq("an action that throws fails the step as ui", broken.failedOn, "ui");
+  ok("naming the action", broken.error?.includes("click button.pay") === true, broken.error);
+  eq("after the actions that did run", broken.ui?.actions.length, 3);
+
+  const noDriver = await runNode(node, meta, { ...vars }, fakeTransport([{}]).transport);
+  ok("without a driver (the in-app runner) a ui step is skipped, not failed", noDriver.ok && !!noDriver.skipped);
+
+  const missing = await runNode(node, meta, {}, fakeTransport([{}]).transport, undefined, fakeUi(page).driver);
+  eq("a missing variable stops it before the browser is touched", missing.failedOn, "request");
+
+  const relative = uiActions({ id: "x", type: "ui", data: { open: "/a" } }, {}, {});
+  ok("a relative open with no ui_base is an error", relative.error?.includes("ui_base") === true);
+
+  // The whole example, hermetically: fake API, fake page.
+  const SRC = await import("node:fs").then((fs) => fs.readFileSync("examples/ui.fml", "utf8"));
+  const doc = parse(SRC, { strict: true }).doc;
+  const ex = fakeUi({ "value(input[name=custname])": "Bret", url: "https://httpbin.org/post", "text(body)": '{"custname": "Bret"}' });
+  const run = await runFlow(doc, {
+    transport: fakeTransport([{ status: 200, body: JSON.stringify({ username: "Bret", email: "b@x.io" }) }]).transport,
+    ui: ex.driver,
+  });
+  ok("examples/ui.fml passes end to end with a fake API and page", run.ok, run.steps.find((x) => !x.ok)?.error);
+  eq("the API's capture was typed into the form", ex.did.find((a) => a.kind === "fill")?.value, "Bret");
+  eq("the walk followed the unlabelled edges after the ui steps", run.steps.map((x) => x.nodeId), ["getUser", "fillForm", "submitted", "Done"]);
+
+  const stops = await runFlow(doc, {
+    transport: fakeTransport([{ status: 200, body: JSON.stringify({ username: "Bret", email: "b@x.io" }) }]).transport,
+    ui: fakeUi({}, "custname").driver,
+  });
+  eq("a failed ui action ends the walk — the page is in an unknown state", stops.steps.map((x) => x.nodeId), ["getUser", "fillForm"]);
+  eq("ui steps' inputs count as required", requiredInputs(parse(`@nodes\n  a = ui\n@node a {\n  fill.q: {term}\n}\n`, { strict: false }).doc), ["term"]);
 }
 
 // 6. chooseEdge ------------------------------------------------------------

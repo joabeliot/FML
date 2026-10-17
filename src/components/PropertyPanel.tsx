@@ -580,6 +580,15 @@ function RunView({ step }: { step: StepResult }) {
   const pass = step.ok;
   const colour = pass ? "var(--color-api)" : "var(--color-danger)";
 
+  if (step.skipped) {
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="font-mono text-[11px] font-semibold text-ink-mute">SKIPPED</span>
+        <p className="text-[11.5px] leading-relaxed text-ink-dim">{step.skipped}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -646,6 +655,19 @@ function RunView({ step }: { step: StepResult }) {
                   {a.ok ? `✔ ${a.expr}` : `✖ ${a.message ?? a.expr}`}
                 </span>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {step.ui && step.ui.actions.length > 0 && (
+        <section>
+          <div className={keyLabel}>did</div>
+          <div className="mt-1 flex flex-col gap-0.5 font-mono text-[11px] text-ink">
+            {step.ui.actions.map((a, i) => (
+              <span key={i} className="truncate" title={a}>
+                {a}
+              </span>
             ))}
           </div>
         </section>

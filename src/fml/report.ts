@@ -89,6 +89,10 @@ export interface ReportStep {
   response?: ReportResponse;
   captures: CaptureResult[];
   asserts: AssertResult[];
+  /** A ui step that didn't run (no driver), and why. */
+  skipped?: string;
+  /** A ui step's actions, in order, and its screenshot path. */
+  ui?: { actions: string[]; screenshot?: string };
 }
 
 /** What, precisely, made the run red. */
@@ -97,6 +101,7 @@ export type FailureKind =
   | "status" // `expect` didn't match
   | "capture" // a capture found nothing
   | "assert" // an `assert.*` failed
+  | "ui" // a ui action (open/fill/click/press/wait) failed
   | "unmodelled" // a status with no drawn edge
   | "ambiguous" // several edges, nothing to choose with
   | "maxSteps"; // the cycle guard tripped
@@ -121,7 +126,8 @@ export interface RunReport {
   startedAt?: string;
   durationMs?: number;
   stoppedBecause: StopReason;
-  summary: { steps: number; requests: number; passed: number; failed: number };
+  /** `requests` counts every step that acts — api calls and ui steps alike. */
+  summary: { steps: number; requests: number; passed: number; failed: number; skipped: number };
   /** The first thing that went wrong — what a fixer reads first. Absent on a pass. */
   failure?: RunFailure;
   steps: ReportStep[];
@@ -195,6 +201,8 @@ export function buildReport(run: RunResult, opts: ReportOptions): RunReport {
     ...(s.response ? { response: response(s.response) } : {}),
     captures: s.captures.map(capture),
     asserts: s.asserts.map(assertion),
+    ...(s.skipped ? { skipped: s.skipped } : {}),
+    ...(s.ui ? { ui: { actions: s.ui.actions.map(redact), ...(s.ui.screenshot ? { screenshot: s.ui.screenshot } : {}) } } : {}),
   });
 
   const steps = run.steps.map(step);
@@ -215,8 +223,9 @@ export function buildReport(run: RunResult, opts: ReportOptions): RunReport {
     summary: {
       steps: run.steps.length,
       requests: requests.length,
-      passed: requests.filter((s) => s.ok).length,
+      passed: requests.filter((s) => s.ok && !s.skipped).length,
       failed: requests.filter((s) => !s.ok).length,
+      skipped: requests.filter((s) => s.skipped).length,
     },
     ...(failure ? { failure } : {}),
     steps,

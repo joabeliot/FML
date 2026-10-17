@@ -149,7 +149,9 @@ export function useFlowRun(): FlowRun {
             setSteps((prev) => [...prev, step]);
             setVisited((prev) => new Set(prev).add(step.nodeId));
             if (!step.passthrough) {
-              setNodeState((prev) => new Map(prev).set(step.nodeId, step.ok ? "passed" : "failed"));
+              setNodeState((prev) =>
+                new Map(prev).set(step.nodeId, step.skipped ? "skipped" : step.ok ? "passed" : "failed"),
+              );
               // Captures land in the store the instant they're read, so the
               // variables view fills in as you watch rather than at the end.
               if (step.captures.length > 0) {

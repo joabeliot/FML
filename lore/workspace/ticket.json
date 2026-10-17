@@ -697,7 +697,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -705,14 +705,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.919953+00:00",
           "event": "created",
           "detail": "FML-18"
+        },
+        {
+          "at": "2026-10-17T09:14:16.030109+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T09:14:16.033775+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:16:48.910210+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -723,10 +738,11 @@
       "context": [
         "ideas/flock-audit-lore-fml.md",
         "ideas/agentic-dev.md",
-        "ideas/flow-execution.md"
+        "ideas/flow-execution.md",
+        "ideas/ui-steps.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -734,14 +750,34 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.924339+00:00",
           "event": "created",
           "detail": "FML-19"
+        },
+        {
+          "at": "2026-10-17T09:31:44.482820+00:00",
+          "event": "context_added",
+          "detail": "ideas/ui-steps.md"
+        },
+        {
+          "at": "2026-10-17T09:43:03.561031+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T09:43:03.564043+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:48:21.734096+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -755,7 +791,7 @@
         "src/lib/fmlEdit.ts"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "ui",
@@ -765,14 +801,29 @@
       ],
       "source": "JB",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T07:29:22.660688+00:00",
           "event": "created",
           "detail": "FML-20"
+        },
+        {
+          "at": "2026-10-17T09:16:54.624944+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T09:16:54.628602+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:21:50.705806+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -787,7 +838,7 @@
         "lore/CONTEXT.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "rml",
@@ -799,12 +850,17 @@
       "created": "2026-10-17",
       "assigned_to": null,
       "started_at": null,
-      "completed_at": null,
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T07:29:38.493448+00:00",
           "event": "created",
           "detail": "FML-21"
+        },
+        {
+          "at": "2026-10-17T09:29:55.190274+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -861,7 +917,7 @@
         "lore/CONTEXT.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P3",
       "tags": [
         "design",
@@ -870,17 +926,128 @@
       ],
       "source": "JB",
       "created": "2026-10-17",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-17T07:30:06.621149+00:00",
           "event": "created",
           "detail": "FML-23"
+        },
+        {
+          "at": "2026-10-17T09:31:44.472169+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:31:44.475893+00:00",
+          "event": "log",
+          "detail": "Design delivered: lore/ideas/live-sync.md. Recommends option A — a dev-only Vite plugin using Vite's own watcher + HMR socket (no new deps); v1 one-way disk->dashboard with live files read-only; v2 two-way via optimistic concurrency (baseHash). Implementation filed as FML-24, pending sign-off on 3 open questions."
+        },
+        {
+          "at": "2026-10-17T09:31:44.479351+00:00",
+          "event": "completed",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "id": "FML-24",
+      "name": "Live sync v1: watched files stream into the dev dashboard (read-only)",
+      "description": "From the FML-23 design (lore/ideas/live-sync.md, option A). FML_WATCH=<dir> npm run dev: a vite/fileSync.ts plugin (apply: serve, never ships) adds the dir to Vite's own watcher and pushes *.fml / *.rml changes over Vite's HMR socket (fml:list, fml:file, fml:gone); the page listens with import.meta.hot.on. Watched files join the workspace marked live and are READ-ONLY in the dashboard in v1 (one-way sync would otherwise silently overwrite dashboard edits). Re-parse keeps the selection when its id survives. No new dependencies. Blocked on sign-off of the design's three open questions (dev-only OK? read-only OK? one dir or many?).",
+      "context": [
+        "ideas/live-sync.md",
+        "../vite/devProxy.ts"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "editor",
+        "dev-server",
+        "live-sync"
+      ],
+      "source": "Claude",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T09:31:36.591679+00:00",
+          "event": "created",
+          "detail": "FML-24"
+        }
+      ]
+    },
+    {
+      "id": "FML-25",
+      "name": "Regression suite: CLI tests in npm test + end-to-end dashboard tests (test:e2e)",
+      "description": "Joab: have test cases for everything done so far so the next feature update can prove nothing existing broke. Delivered: scripts/cli.test.ts (in npm test), scripts/e2e.ts (npm run test:e2e), fixture server, npm run test:all; registry rewritten. Caught three real bugs on the way (drift variable base; FML-20 swallowing portal double-click; drop-on-card connect).",
+      "context": [
+        "testing/registry.md"
+      ],
+      "plan": null,
+      "status": "done",
+      "priority": "P1",
+      "tags": [
+        "testing"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
+      "logs": [
+        {
+          "at": "2026-10-17T10:12:02.710284+00:00",
+          "event": "created",
+          "detail": "FML-25"
+        },
+        {
+          "at": "2026-10-17T10:12:02.733685+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T10:12:02.736849+00:00",
+          "event": "completed",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "id": "FML-26",
+      "name": "Pause for human input mid-run: a flow stops, asks for a value, continues on confirm",
+      "description": "Joab: a run should be able to pause in the middle for human intervention — e.g. a step needs data only a person can provide (an OTP from SMS/email, a 2FA code, approving something in another app, a value read off a device). The flow pauses at that point, asks for it, and once the person confirms it carries on with the value available as {name} to later nodes.\n\nNot started — to be designed when picked up. Things to decide then:\n- How it's written: a new node type (e.g. `input`/`pause`) vs a key on an existing node (e.g. `ask.<var>: prompt text` on api/ui/page nodes, asked before the node runs).\n- Shape of the pause: value entry (one or more named fields, secret-ish ones masked), or a plain 'continue when ready' checkpoint with no value (e.g. 'approve the push notification, then click Continue').\n- Engine: run.ts stays network/UI-agnostic — inject an ask hook in RunOptions (like Transport/UiDriver); the walk awaits it. Cancel = abort the run cleanly.\n- Where: in-app runner (modal like RunInputs, run bar shows 'waiting for you'); CLI (prompt on stdin when interactive; non-interactive/CI must not hang — fail fast or take the value from --var / FML_VAR_ / .fml.env if supplied up front).\n- Asked values are run-time inputs: never written to the file, redacted like secrets when they look secret.\n- Report: --json records that the step waited and for how long (not the value).\n- Tests: engine with a fake ask hook; CLI with piped stdin and with non-interactive; e2e for the in-app modal.",
+      "context": [
+        "ideas/flow-execution.md",
+        "../src/fml/run.ts",
+        "../src/hooks/useFlowRun.ts",
+        "../src/components/RunInputs.tsx"
+      ],
+      "plan": null,
+      "status": "backlog",
+      "priority": "P2",
+      "tags": [
+        "runner",
+        "execution",
+        "ux"
+      ],
+      "source": "Joab",
+      "created": "2026-10-17",
+      "assigned_to": null,
+      "started_at": null,
+      "completed_at": null,
+      "logs": [
+        {
+          "at": "2026-10-17T10:16:01.487580+00:00",
+          "event": "created",
+          "detail": "FML-26"
         }
       ]
     }
   ],
-  "counter": 24
+  "counter": 27
 }

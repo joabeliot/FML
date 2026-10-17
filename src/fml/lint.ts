@@ -107,6 +107,34 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
       }
     }
 
+    // A malformed assertion can't do anything but fail — say why up front,
+    // rather than as a red step the first time the flow actually runs.
+    // (api and ui nodes both assert; everything else ignores assert keys.)
+    if (node.type === "api" || node.type === "ui") {
+      for (const [key, value] of Object.entries(node.data)) {
+        if (!key.startsWith("assert.")) continue;
+        const label = key.slice("assert.".length);
+        if (label.trim() === "") continue; // already flagged as "no name after the dot"
+        const parsed = parseAssertion(label, value);
+        if (!parsed.ok) add(node.id, "warning", `${key} ${parsed.error}`, key);
+      }
+    }
+
+    if (node.type === "ui") {
+      const data = node.data;
+      const open = data.open?.trim();
+      if (open && !isAbsolute(open) && !(doc.meta.ui_base ?? "").trim()) {
+        add(node.id, "warning", `"open: ${open}" is relative but the doc has no "@meta ui_base" — it can't run until one exists`, "open");
+      }
+      for (const key of ["click", "wait", "press"] as const) {
+        if (data[key] !== undefined && data[key]!.trim() === "") add(node.id, "warning", `"${key}" is empty — it does nothing`, key);
+      }
+      for (const key of Object.keys(data)) {
+        if (key.startsWith("fill.") && key.slice(5).trim() === "") add(node.id, "warning", `"${key}" has no selector after the dot`, key);
+      }
+      continue;
+    }
+
     if (node.type !== "api") continue;
 
     // 3. Everything below is about actually sending the request.
@@ -168,15 +196,6 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
       }
     }
 
-    // A malformed assertion can't do anything but fail — say why up front,
-    // rather than as a red step the first time the flow actually runs.
-    for (const [key, value] of Object.entries(data)) {
-      if (!key.startsWith("assert.")) continue;
-      const label = key.slice("assert.".length);
-      if (label.trim() === "") continue; // already flagged as "no name after the dot"
-      const parsed = parseAssertion(label, value);
-      if (!parsed.ok) add(node.id, "warning", `${key} ${parsed.error}`, key);
-    }
 
   }
 

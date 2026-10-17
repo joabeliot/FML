@@ -1,0 +1,63 @@
+# ui.fml — one flow across the API and the UI (FML-19).
+#
+#   node scripts/run.ts examples/ui.fml               # headless
+#   node scripts/run.ts examples/ui.fml --headed      # watch it
+#   node scripts/run.ts examples/ui.fml --dry         # the plan, no browser
+#
+# An `api` node fetches a user; `ui` nodes put that user into a real web
+# form, submit it, and check the page shows what was sent. The value threads
+# from a JSON response into a browser the same way it threads between two
+# API calls: `capture` on one node, `{name}` on the next.
+#
+# A `ui` node does, in order: open → fill.<field> → click → press → wait,
+# then its captures and asserts (read off the page: text(sel), count(sel),
+# value(sel), visible(sel), attr(sel, name), url, title), then a screenshot.
+# A longer journey is a chain of ui nodes. `fill.<field>` finds the field by
+# name, id or data-testid (a key can't hold a CSS selector); for anything
+# else, start the value with sel(<css>): `fill.q: sel(.search input) {term}`.
+#
+# Runs from the CLI only (Playwright drives the browser); the in-app runner
+# skips ui steps. Screenshots land in ./fml-artifacts.
+
+@meta
+  title: API → UI — a captured user, typed into a form
+  base: https://jsonplaceholder.typicode.com
+  ui_base: https://httpbin.org
+
+@vars
+  userId: 1
+
+@nodes
+  getUser    = api
+  fillForm   = ui
+  submitted  = ui
+  Done       = page
+
+@node getUser {
+  method: GET
+  path: /users/{userId}
+  capture.username: $.username
+  capture.email: $.email
+  expect: 200
+}
+
+@node fillForm {
+  open: /forms/post
+  fill.custname: {username}
+  fill.custemail: {email}
+  assert.typed: value(input[name=custname]) == {username}
+  screenshot: filled
+}
+
+@node submitted {
+  click: button
+  wait: body
+  assert.url: matches /post$
+  assert.echoed: text(body) matches {username}
+  screenshot: submitted
+}
+
+@flow
+  getUser -200> fillForm
+  fillForm -> submitted
+  submitted -> Done

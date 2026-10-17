@@ -117,9 +117,23 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
   ok("assert is a known prefix", !has(issues, "a", "isn't part of the api standard"));
 }
 
+// 5c. ui nodes (FML-19)
+{
+  const issues = lintOf(
+    `@nodes\n  a = ui\n@node a {\n  open: /login\n  click:\n  fill.: x\n  assert.h: text(h1)\n  fill.email: me@x.io\n  screenshot: a\n}\n`,
+  );
+  ok("relative open without ui_base", has(issues, "a", "ui_base"));
+  ok("empty click", has(issues, "a", `"click" is empty`));
+  ok("fill with no field", has(issues, "a", "no name after the dot"));
+  ok("an assert with a page read but nothing to compare", has(issues, "a", "assert.h"));
+  ok("fill.<field> and screenshot are standard ui keys", !issues.some((i) => i.key === "fill.email" || i.key === "screenshot"));
+  const clean = lintOf(`@meta\n  ui_base: https://x.test\n@nodes\n  a = ui\n@node a {\n  open: /login\n  click: button\n  assert.title: matches ^Log\n}\n`);
+  eq("a well-formed ui node is silent", clean, []);
+}
+
 // 6. every shipped example lints clean
 {
-  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml", "examples/bytes.fml"];
+  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml", "examples/bytes.fml", "examples/ui.fml"];
   for (const file of clean) {
     // Read through parse so @meta/@vars are real; no @fof in these.
     const src = await import("node:fs").then((fs) => fs.readFileSync(file, "utf8"));

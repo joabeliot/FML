@@ -1,10 +1,15 @@
 // Usage: node scripts/run.ts <file.fml> [--doc <name>] [--start <nodeId>]
 //                            [--var name=value ...] [--dry] [--fail-fast]
 //                            [--json] [--report <out.json>]
+//                            [--headed] [--artifacts <dir>]
 //
 // --json prints the machine-readable run report (src/fml/report.ts) instead
 // of the step log; --report writes the same report to a file and keeps the
 // log on screen. Either way secrets are redacted and the exit code is 0/1.
+//
+// `ui` nodes (FML-19) are driven with Playwright (scripts/uiDriver.ts),
+// loaded only when the flow has one. --headed shows the browser; screenshots
+// go to --artifacts (default ./fml-artifacts).
 //
 // Executes an FML flow for real. Node has no CORS, so this runs today — the
 // browser runner is a transport swap away, not a rewrite (see src/fml/run.ts).
@@ -26,14 +31,16 @@ import {
   buildRequest,
   requiredInputs,
   runFlow,
+  uiActions,
   type HttpRequest,
   type StepResult,
   type Transport,
+  type UiDriver,
 } from "../src/fml/run.ts";
 
 const args = process.argv.slice(2);
 // Flags that take a value — their value is not a positional argument.
-const VALUE_FLAGS = new Set(["--doc", "--start", "--var", "--report", "--secrets"]);
+const VALUE_FLAGS = new Set(["--doc", "--start", "--var", "--report", "--secrets", "--artifacts"]);
 const positional = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.has(args[i - 1] ?? ""));
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
@@ -160,6 +167,16 @@ const send: Transport = async (req: HttpRequest, signal?: AbortSignal) => {
 function printPlan(): void {
   let unresolved = 0;
   for (const node of flow.nodes) {
+    if (node.type === "ui") {
+      const plan = uiActions(node, flow.meta, { ...flow.vars, ...supplied });
+      console.log(`  ▸  ${node.id}  (ui)${plan.error ? `  ✖ ${plan.error}` : ""}`);
+      for (const a of plan.actions) {
+        const what = a.kind === "fill" ? `${a.target} = ${a.value ?? ""}` : a.kind === "press" ? `${a.target} ${a.value ?? ""}`.trim() : a.target;
+        console.log(`        ${a.kind} ${redact(what)}`);
+      }
+      if (plan.missing.length > 0) console.log(`        pending: ${plan.missing.map((n) => `{${n}}`).join(", ")}`);
+      continue;
+    }
     if (node.type !== "api") continue;
     const built = buildRequest(node, flow.meta, { ...flow.vars, ...supplied });
     if (built.error) {
@@ -192,6 +209,21 @@ function line(step: StepResult): void {
     console.log(`  ·  ${step.nodeId}  (${step.type})`);
     return;
   }
+  if (step.type === "ui") {
+    const ms = step.durationMs === undefined ? "" : `  ${step.durationMs}ms`;
+    console.log(`  ${step.skipped ? "–" : step.ok ? "✔" : "✖"}  ${step.nodeId}  (ui)${ms}`);
+    if (step.skipped) console.log(`        skipped: ${step.skipped}`);
+    for (const a of step.ui?.actions ?? []) console.log(`        ${redact(a)}`);
+    for (const c of step.captures) {
+      console.log(c.ok ? `        capture ${c.name} = ${redact(c.value ?? "")}` : `        capture ${c.name} ✖ nothing at "${c.path}"`);
+    }
+    for (const a of step.asserts) {
+      console.log(a.ok ? `        assert ${a.label} ✔ ${a.expr}` : `        assert ${a.label} ✖ ${a.expr} — ${redact(a.message ?? "failed")}`);
+    }
+    if (step.ui?.screenshot) console.log(`        screenshot ${step.ui.screenshot}`);
+    if (step.error) console.log(`        ${redact(step.error)}`);
+    return;
+  }
   const mark = step.ok ? "✔" : "✖";
   const req = step.request;
   const head = req ? `${req.method} ${redact(req.url)}` : "";
@@ -220,14 +252,29 @@ if (dry) {
   process.exit(0);
 }
 
+// A browser only when the flow has a ui step — API-only runs never load Playwright.
+let ui: (UiDriver & { close(): Promise<void> }) | undefined;
+if (flow.nodes.some((n) => n.type === "ui")) {
+  try {
+    const { createPlaywrightDriver } = await import("./uiDriver.ts");
+    ui = await createPlaywrightDriver({ headed: has("headed"), artifacts: flag("artifacts") ?? "fml-artifacts" });
+  } catch (err) {
+    console.error(`this flow has ui steps, but no browser could be started — ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+}
+
 const startedAt = new Date();
 const run = await runFlow(flow, {
+  ...(ui ? { ui } : {}),
   transport: send,
   vars: supplied,
   ...(flag("start") ? { start: flag("start")! } : {}),
   stopOnFailure: has("fail-fast"),
   onStep: asJson ? undefined : line,
 });
+
+await ui?.close();
 
 const reportPath = flag("report");
 if (asJson || reportPath) {

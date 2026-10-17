@@ -56,7 +56,22 @@ export interface FmlIssue {
   file?: string;
 }
 
+/**
+ * The node-type standard a parse checks against. FML's own (`nodeTypes.ts`)
+ * is the default; a sibling language on the same grammar — RML — passes its
+ * own, so the line grammar, comments, @doc and @fof are shared, not copied.
+ */
+export interface FmlVocabulary {
+  /** The standard type names, for messages. */
+  names: readonly string[];
+  isKnown(type: string): boolean;
+  /** Expected keys a node of this type is missing (strict-mode hints). */
+  missing(type: string, data: Record<string, string>): string[];
+}
+
 export interface ParseOptions {
+  /** Node-type standard to check against. Defaults to FML's. */
+  vocabulary?: FmlVocabulary;
   /**
    * true (default): a flow reference to an undeclared node is an error.
    * false: the node is auto-created with type "unknown" and a warning.

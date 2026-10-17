@@ -1,4 +1,4 @@
-export { parse } from "./parse.ts";
+export { FML_VOCABULARY, parse } from "./parse.ts";
 export { analyze, analyzeFile, formatStats } from "./stats.ts";
 export {
   EXEC_KEY_PREFIXES,
@@ -19,6 +19,7 @@ export type {
   FmlIssue,
   FmlNode,
   FmlNodeType,
+  FmlVocabulary,
   ParseOptions,
   ParseResult,
 } from "./types.ts";

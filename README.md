@@ -55,7 +55,7 @@ Full reference: **[HOW-TO.md](HOW-TO.md)**.
 | `@doc <name>` | more than one diagram in one file |
 | `@fof <path>` | pull in another `.fml` file (no extension — it's always `.fml`) |
 
-Five node types carry the meaning: `page`, `api`, `decision`, `event`, `flow`.
+Six node types carry the meaning: `page`, `api`, `decision`, `event`, `flow`, `ui`.
 Anything else draws but warns.
 
 ## Development
@@ -63,7 +63,9 @@ Anything else draws but warns.
 ```bash
 npm install
 npm run dev        # vite dev server
-npm test           # parser, stats and write-back suites
+npm test           # unit suites + the CLIs against a local fixture API (no internet)
+npm run test:e2e   # the dashboard, end to end, in Chrome via Playwright (--headed to watch)
+npm run test:all   # test + build + e2e — before any release
 npm run demo -- examples/shop.fml   # structural read, no canvas needed
 npm run build      # tsc -b && vite build
 ```

@@ -31,10 +31,18 @@ import type {
   FmlEdge,
   FmlIssue,
   FmlNode,
+  FmlVocabulary,
   ParseOptions,
   ParseResult,
 } from "./types.ts";
 import { NODE_TYPE_NAMES, UNTYPED, isKnownType, missingKeys } from "./nodeTypes.ts";
+
+/** FML's own node-type standard — the default vocabulary. */
+export const FML_VOCABULARY: FmlVocabulary = {
+  names: NODE_TYPE_NAMES,
+  isKnown: isKnownType,
+  missing: missingKeys,
+};
 
 interface Line {
   /** 1-based source line number. */
@@ -308,6 +316,7 @@ function parseDoc(
   strict: boolean,
   errors: FmlIssue[],
   warnings: FmlIssue[],
+  vocab: FmlVocabulary,
 ): FmlDoc {
   const sections = sectionize(lines, errors);
 
@@ -363,10 +372,10 @@ function parseDoc(
       if (table.has(id)) {
         warnings.push({ line: l.n, message: `node "${id}" redeclared` });
       }
-      if (!isKnownType(type)) {
+      if (!vocab.isKnown(type)) {
         const message =
           `unknown node type "${type}" for "${id}" — ` +
-          `the standard types are ${NODE_TYPE_NAMES.join(", ")}`;
+          `the standard types are ${vocab.names.join(", ")}`;
         (strict ? errors : warnings).push({ line: l.n, message });
       }
       declLine.set(id, l.n);
@@ -399,7 +408,7 @@ function parseDoc(
   // gave it without nagging, which is what you want while you are still typing.
   if (strict) {
     for (const node of table.values()) {
-      const missing = missingKeys(node.type, node.data);
+      const missing = vocab.missing(node.type, node.data);
       if (missing.length === 0) continue;
       warnings.push({
         line: declLine.get(node.id) ?? 0,
@@ -459,6 +468,7 @@ const MAX_FOF_DEPTH = 16;
 
 interface FofCtx {
   strict: boolean;
+  vocab: FmlVocabulary;
   resolve: ((path: string, from: string | undefined) => string | undefined) | undefined;
   errors: FmlIssue[];
   warnings: FmlIssue[];
@@ -474,7 +484,7 @@ function resolveFile(src: string, sourcePath: string | undefined, ctx: FofCtx): 
   const wStart = warnings.length;
 
   const { chunks, fofs } = splitFile(lex(src), errors, warnings);
-  const localDocs = chunks.map((c) => parseDoc(c.name, c.lines, ctx.strict, errors, warnings));
+  const localDocs = chunks.map((c) => parseDoc(c.name, c.lines, ctx.strict, errors, warnings, ctx.vocab));
   for (const d of localDocs) d.source = sourcePath;
 
   // Tag this file's own issues with its path, before recursion adds deeper ones.
@@ -554,6 +564,7 @@ export function parse(src: string, opts: ParseOptions = {}): ParseResult {
   const warnings: FmlIssue[] = [];
   const ctx: FofCtx = {
     strict: opts.strict !== false,
+    vocab: opts.vocabulary ?? FML_VOCABULARY,
     resolve: opts.resolve,
     errors,
     warnings,

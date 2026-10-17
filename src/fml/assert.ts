@@ -11,6 +11,9 @@
 //                                        own path; the suffix is then only a
 //                                        label for messages (needed for `[0]`
 //                                        and `$`, which a key can't contain)
+//   assert.title: text(h1) == Welcome     so does a page read on a `ui` node —
+//                                        text( count( value( visible( attr( —
+//                                        a CSS selector can't be a key either
 //
 // Comparisons:
 //
@@ -75,7 +78,12 @@ export function parseAssertion(label: string, value: string): ParsedAssertion {
 
   let path = label;
   let rest = source;
-  if (rest.startsWith("$")) {
+  const call = pageReadEnd(rest);
+  if (call !== undefined) {
+    path = rest.slice(0, call);
+    rest = rest.slice(call).trim();
+    if (rest === "") return { ok: false, error: `names a path ("${path}") but nothing to compare it with` };
+  } else if (rest.startsWith("$")) {
     const space = rest.search(/\s/);
     if (space === -1) return { ok: false, error: `names a path ("${rest}") but nothing to compare it with` };
     path = rest.slice(0, space);
@@ -130,6 +138,41 @@ export function parseAssertion(label: string, value: string): ParsedAssertion {
   }
 
   return make("eq", rest);
+}
+
+/** Page reads a `ui` node's assert/capture can name — see run.ts `UiDriver.read`. */
+export const PAGE_READS = ["text", "count", "value", "visible", "attr"] as const;
+
+/**
+ * If `text` starts with a page read like `text([data-x="a(b)"])`, the index
+ * just past its closing paren — matched with nesting and quotes, since a CSS
+ * selector can hold both. Undefined when it doesn't start with one.
+ */
+export function pageReadEnd(text: string): number | undefined {
+  return callEnd(text, PAGE_READS);
+}
+
+/**
+ * If `text` starts with `name(…)` for one of `names`, the index just past the
+ * matching close paren — nesting and quotes respected, since a CSS selector
+ * can hold both. Shared by page reads and ui's `sel(…)`.
+ */
+export function callEnd(text: string, names: readonly string[]): number | undefined {
+  const m = text.match(/^([a-z]+)\(/);
+  if (!m || !names.includes(m[1]!)) return undefined;
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = m[1]!.length; i < text.length; i++) {
+    const c = text[i]!;
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return i + 1;
+  }
+  return undefined;
 }
 
 /** Strip one pair of surrounding double quotes — the escape for a literal string. */

@@ -1,0 +1,196 @@
+# roadmap.rml — F*ML's own roadmap, in RML.
+#
+# RML is FML's grammar with a different meaning: nodes are features and
+# milestones, and `A -> B` reads "A unlocks B" (B depends on A). A node can
+# depend on several others — it's a DAG.
+#
+#   status       pending | active | done   (pending when absent)
+#   area         a category — nodes in one area share a colour
+#   description  shown on hover and in the side panel
+#   fml          a .fml file that proves it (opens in the flow view if loaded)
+#   ticket       lore ticket ids, comma-separated
+#
+# A pending node whose dependencies are all done shows as READY — the
+# frontier. Built-but-in-review work is `active` here, not `done`.
+
+@meta
+  title: F*ML roadmap
+
+@nodes
+  parser          = feature
+  engine          = feature
+  runUi           = feature
+  multiHost       = feature
+  assertions      = feature
+  bytes           = feature
+  conditionalGet  = feature
+  runReport       = feature
+  secrets         = feature
+  drift           = feature
+  stagingGate     = feature
+  uiSteps         = feature
+  structural      = feature
+  sockets         = feature
+  liveSync        = feature
+  rml             = feature
+  executable      = milestone
+  gate            = milestone
+  editor          = milestone
+  roadmaps        = milestone
+
+@node parser {
+  status: done
+  area: language
+  description: The .fml grammar — @nodes, @node blocks, @flow, @doc, @fof
+}
+
+@node engine {
+  status: done
+  area: runner
+  description: run.ts — sends api nodes, threads captures, asserts expect, routes on status
+  fml: run
+}
+
+@node runUi {
+  status: done
+  area: runner
+  description: Run from the canvas — live step status, camera-follow
+}
+
+@node multiHost {
+  status: done
+  area: runner
+  description: A node's own base overrides @meta base
+  fml: multi-host
+}
+
+@node assertions {
+  status: done
+  area: runner
+  description: assert.<path> on bodies and headers — matches, exists, absent, ~N+-T
+  fml: assertions
+  ticket: FML-11, FML-12
+}
+
+@node bytes {
+  status: done
+  area: runner
+  description: body.sha256, body.bytes, Range 206/416
+  fml: bytes
+  ticket: FML-13
+}
+
+@node conditionalGet {
+  status: done
+  area: runner
+  description: ETag captured, replayed, 304 expected — strong and weak
+  fml: conditional-get
+  ticket: FML-14
+}
+
+@node runReport {
+  status: done
+  area: runner
+  description: --json / --report with a classified failure and redaction
+  ticket: FML-15
+}
+
+@node secrets {
+  status: done
+  area: runner
+  description: .fml.env and FML_SECRET_, redacted by value everywhere
+  ticket: FML-17
+}
+
+@node drift {
+  status: active
+  area: runner
+  description: Flows vs the API's OpenAPI spec — built, in review
+  ticket: FML-18
+}
+
+@node stagingGate {
+  area: runner
+  description: Run flows against a deployed staging URL as the done-check
+  ticket: FML-16
+}
+
+@node uiSteps {
+  area: runner
+  description: A step that drives a browser or simulator inside a flow
+  ticket: FML-19
+}
+
+@node structural {
+  status: done
+  area: editor
+  description: Add, delete and rename nodes and edges from the dashboard
+  ticket: FML-22
+}
+
+@node sockets {
+  status: active
+  area: editor
+  description: Data wires between capture and {name} — built, in review
+  ticket: FML-20
+}
+
+@node liveSync {
+  area: editor
+  description: An agent edits the file, the open dashboard follows
+  ticket: FML-23
+}
+
+@node rml {
+  status: active
+  area: roadmap
+  description: This file's language and its view
+  ticket: FML-21
+}
+
+@node executable {
+  status: done
+  area: runner
+  description: A flow runs as a test and says whether the API said the right thing
+}
+
+@node gate {
+  area: runner
+  description: Flows are the done-check — CI and staging, drift-checked
+}
+
+@node editor {
+  area: editor
+  description: Build and wire a whole flow without typing FML
+}
+
+@node roadmaps {
+  area: roadmap
+  description: Lore, FML and RML linked — a roadmap node points at the flow that proves it and the ticket driving it
+}
+
+@flow
+  parser -> engine
+  engine -> runUi
+  engine -> multiHost
+  engine -> assertions
+  assertions -> bytes
+  assertions -> conditionalGet
+  engine -> runReport
+  runReport -> secrets
+  assertions -> executable
+  runReport -> executable
+  parser -> drift
+  executable -> stagingGate
+  secrets -> stagingGate
+  stagingGate -> gate
+  drift -> gate
+  executable -> uiSteps
+  parser -> structural
+  structural -> sockets
+  structural -> liveSync
+  sockets -> editor
+  liveSync -> editor
+  parser -> rml
+  rml -> roadmaps
+  editor -> roadmaps
