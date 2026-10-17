@@ -40,6 +40,17 @@ export {
   statusMatches,
 } from "./run.ts";
 export { evaluateAssertion, parseAssertion } from "./assert.ts";
+export { buildReport, collectSecrets, isSecretName, makeRedactor } from "./report.ts";
+export type {
+  FailureKind,
+  Redactor,
+  ReportOptions,
+  ReportRequest,
+  ReportResponse,
+  ReportStep,
+  RunFailure,
+  RunReport,
+} from "./report.ts";
 export type { AssertOp, Assertion, AssertOutcome, ParsedAssertion } from "./assert.ts";
 export type {
   AssertResult,

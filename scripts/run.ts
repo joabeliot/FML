@@ -1,5 +1,10 @@
 // Usage: node scripts/run.ts <file.fml> [--doc <name>] [--start <nodeId>]
-//                            [--var name=value ...] [--dry] [--json] [--fail-fast]
+//                            [--var name=value ...] [--dry] [--fail-fast]
+//                            [--json] [--report <out.json>]
+//
+// --json prints the machine-readable run report (src/fml/report.ts) instead
+// of the step log; --report writes the same report to a file and keeps the
+// log on screen. Either way secrets are redacted and the exit code is 0/1.
 //
 // Executes an FML flow for real. Node has no CORS, so this runs today — the
 // browser runner is a transport swap away, not a rewrite (see src/fml/run.ts).
@@ -7,9 +12,10 @@
 // Secrets: prefer the environment over --var, which lands in shell history.
 // Any `{password}` the file references can be supplied as FML_VAR_password.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
 import { parse, type FmlDoc } from "../src/fml/index.ts";
+import { buildReport, collectSecrets } from "../src/fml/report.ts";
 import {
   buildRequest,
   requiredInputs,
@@ -20,7 +26,9 @@ import {
 } from "../src/fml/run.ts";
 
 const args = process.argv.slice(2);
-const positional = args.filter((a) => !a.startsWith("--"));
+// Flags that take a value — their value is not a positional argument.
+const VALUE_FLAGS = new Set(["--doc", "--start", "--var", "--report"]);
+const positional = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.has(args[i - 1] ?? ""));
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i === -1 ? undefined : args[i + 1];
@@ -172,6 +180,7 @@ if (dry) {
   process.exit(0);
 }
 
+const startedAt = new Date();
 const run = await runFlow(flow, {
   transport: send,
   vars: supplied,
@@ -180,9 +189,21 @@ const run = await runFlow(flow, {
   onStep: asJson ? undefined : line,
 });
 
-if (asJson) {
-  console.log(JSON.stringify(run, null, 2));
-} else {
+const reportPath = flag("report");
+if (asJson || reportPath) {
+  const report = buildReport(run, {
+    doc: flow.name,
+    file,
+    startedAt: startedAt.toISOString(),
+    durationMs: Date.now() - startedAt.getTime(),
+    secrets: collectSecrets({ ...supplied, ...run.vars }),
+  });
+  const text = JSON.stringify(report, null, 2);
+  if (reportPath) writeFileSync(reportPath, `${text}\n`);
+  if (asJson) console.log(text);
+}
+
+if (!asJson) {
   console.log(
     `\n${run.ok ? "PASS" : "FAIL"}  ${flow.name}  —  ${run.steps.filter((s) => !s.passthrough).length} request(s), stopped: ${run.stoppedBecause}`,
   );

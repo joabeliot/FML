@@ -321,6 +321,11 @@ export interface StepResult {
   expect?: string;
   ok: boolean;
   error?: string;
+  /**
+   * Which check `error` is about, when the step failed — the first one in
+   * runNode's precedence: no response at all, then status, capture, assert.
+   */
+  failedOn?: "request" | "status" | "capture" | "assert";
   durationMs?: number;
 }
 
@@ -402,11 +407,12 @@ export async function runNode(
   if (node.type !== "api") return { ...base, passthrough: true };
 
   const built = buildRequest(node, meta, vars);
-  if (built.error) return { ...base, ok: false, error: built.error };
+  if (built.error) return { ...base, ok: false, failedOn: "request", error: built.error };
   if (built.missing.length > 0) {
     return {
       ...base,
       ok: false,
+      failedOn: "request",
       error: `${node.id}: no value for ${built.missing.map((n) => `{${n}}`).join(", ")} — declare it in @vars, capture it earlier, or supply it when you run`,
     };
   }
@@ -421,6 +427,7 @@ export async function runNode(
       ...base,
       request,
       ok: false,
+      failedOn: "request",
       durationMs: Date.now() - started,
       error: `${node.id}: request failed — ${err instanceof Error ? err.message : String(err)}`,
     };
@@ -441,9 +448,17 @@ export async function runNode(
   const failedAssert = asserts.find((a) => !a.ok);
 
   let error: string | undefined;
-  if (!statusOk) error = `${node.id}: expected ${expect}, got ${response.status}`;
-  else if (failedCapture) error = `${node.id}: capture.${failedCapture.name} found nothing at "${failedCapture.path}"`;
-  else if (failedAssert) error = `${node.id}: assert.${failedAssert.label} ${failedAssert.message}`;
+  let failedOn: StepResult["failedOn"];
+  if (!statusOk) {
+    error = `${node.id}: expected ${expect}, got ${response.status}`;
+    failedOn = "status";
+  } else if (failedCapture) {
+    error = `${node.id}: capture.${failedCapture.name} found nothing at "${failedCapture.path}"`;
+    failedOn = "capture";
+  } else if (failedAssert) {
+    error = `${node.id}: assert.${failedAssert.label} ${failedAssert.message}`;
+    failedOn = "assert";
+  }
 
   return {
     ...base,
@@ -455,6 +470,7 @@ export async function runNode(
     durationMs,
     ok: !error,
     ...(error ? { error } : {}),
+    ...(failedOn ? { failedOn } : {}),
   };
 }
 

@@ -472,7 +472,39 @@ never went out (missing variable, dead host) always stops the walk: there's no
 status to route on.
 
 **Flags:** `--doc <name>` picks a doc, `--start <nodeId>` starts elsewhere,
-`--fail-fast` stops at the first failed step, `--json` dumps the whole run.
+`--fail-fast` stops at the first failed step, `--json` prints the run report
+instead of the step log, `--report <file>` writes the report and keeps the log.
+
+**The run report** (`--json` / `--report`) is for whatever reads the result
+next — CI, a script, another agent writing the fix. Its `failure` field is the
+first thing that went wrong, already classified:
+
+```json
+{
+  "schema": 1,
+  "ok": false,
+  "summary": { "steps": 4, "requests": 2, "passed": 1, "failed": 1 },
+  "failure": {
+    "kind": "assert",
+    "nodeId": "getPosts",
+    "message": "getPosts: assert.count expected >= 12, got 10",
+    "assertion": { "label": "count", "path": "$.length", "expr": "$.length >= 12", "actual": "10", "ok": false },
+    "request": { "method": "GET", "url": "https://…/posts?userId=1", "headers": {} },
+    "response": { "status": 200, "headers": { "…": "…" }, "body": "[…]", "bodyBytes": 27520 }
+  },
+  "steps": [ "… every step, same shape, with captures, asserts and durationMs …" ],
+  "vars": { "username": "Bret" }
+}
+```
+
+`kind` is one of `request` (nothing was sent — missing variable, no base,
+dead host), `status`, `capture`, `assert`, `unmodelled`, `ambiguous` or
+`maxSteps`. Bodies over 64 KiB are cut, with `bodyTruncated: true` and the
+real `bodyBytes`. **Secrets are redacted by value**: every supplied or captured
+variable whose name looks secret (`token`, `password`, `key`, `auth`,
+`session`, …) is replaced with `[redacted:<name>]` wherever it shows up — URL,
+header, body, a later capture. `Authorization`, `Cookie`, `Set-Cookie` and
+`X-Api-Key` headers are always hidden.
 
 ### Checking a file before you run it
 
