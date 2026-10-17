@@ -335,6 +335,43 @@ the path; `--fail-fast` stops at it instead. The step log prints every assert
 with ✔/✖ and what actually came back. See `examples/assertions.fml`, which
 fails on purpose.
 
+### Conditional GET — ETag in, 304 out
+
+No special syntax: capture the `ETag` header, send it back as
+`If-None-Match`, expect `304`.
+
+```
+@node fetch {
+  method: GET
+  path: /media/{id}
+  capture.etag: header.ETag
+  expect: 200
+}
+
+@node replay {
+  method: GET
+  path: /media/{id}
+  header.If-None-Match: {etag}
+  expect: 304
+  assert.emptyBody: $ == ""
+}
+
+@node replayWeak {
+  method: GET
+  path: /media/{id}
+  header.If-None-Match: W/{etag}       # what an edge/CDN may rewrite it to
+  expect: 304
+}
+```
+
+The weak replay is the one worth having. A CDN may legally turn a strong ETag
+into a weak `W/"…"` one, and `If-None-Match` is defined to use *weak*
+comparison — so the origin must still say 304. An origin that compares
+exactly says 200, and every client re-downloads every time. Add a replay with
+a tag the server never issued, expecting 200, so a server that always answers
+304 can't pass either. Full flow: `examples/conditional-get.fml` (runs against
+httpbin.org).
+
 ### Running a flow
 
 ```bash

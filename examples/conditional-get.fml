@@ -1,0 +1,77 @@
+# conditional-get.fml — ETag round-trip: capture it, replay it, expect 304.
+#
+#   node scripts/run.ts examples/conditional-get.fml
+#
+# A cache-friendly API hands back an ETag; a client that sends it back as
+# If-None-Match should get `304 Not Modified` and no body. Nothing new in the
+# language is needed: `capture.<var>: header.<Name>` pulls the ETag out, and
+# `header.If-None-Match: {etag}` spends it.
+#
+# The weak replay is the one that catches real bugs. A CDN or edge worker that
+# rewrites a strong ETag to a weak one (W/"…") is legal — but RFC 9110 says
+# If-None-Match uses the *weak* comparison, so the origin must still answer
+# 304. An origin doing an exact string match answers 200 instead and every
+# cached client re-downloads forever (the Flock v2 media bug). `expect: 304`
+# on `replayWeak` is that regression test.
+
+@meta
+  title: Conditional GET — ETag captured, replayed, 304 expected
+  base: https://httpbin.org
+
+@vars
+  tag: fml-demo-1
+
+@nodes
+  Start       = page
+  fetch       = api
+  replay      = api
+  replayWeak  = api
+  stale       = api
+  Done        = page
+  Refetched   = page
+
+@node fetch {
+  method: GET
+  path: /etag/{tag}
+  capture.etag: header.ETag
+  expect: 200
+  assert.header.ETag: exists
+}
+
+@node replay {
+  method: GET
+  path: /etag/{tag}
+  header.If-None-Match: {etag}
+  expect: 304
+  assert.emptyBody: $ == ""
+}
+
+# The same ETag, weakened the way an edge would rewrite it.
+
+@node replayWeak {
+  method: GET
+  path: /etag/{tag}
+  header.If-None-Match: W/{etag}
+  expect: 304
+}
+
+# A tag the server never issued must NOT match — otherwise "304" is just a
+# server that always says 304.
+
+@node stale {
+  method: GET
+  path: /etag/{tag}
+  header.If-None-Match: some-other-version
+  expect: 200
+}
+
+@flow
+  Start -run> fetch
+  fetch -200> replay
+  replay:
+    -304> replayWeak
+    -200> Refetched
+  replayWeak:
+    -304> stale
+    -200> Refetched
+  stale -200> Done

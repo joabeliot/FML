@@ -386,6 +386,38 @@ function fakeTransport(
   ok("exists catches a missing header", missing.asserts[1]?.ok === false);
 }
 
+// 5e. conditional GET — capture an ETag, replay it, expect 304 ------------
+{
+  const SRC = await import("node:fs").then((fs) => fs.readFileSync("examples/conditional-get.fml", "utf8"));
+  const doc = parse(SRC, { strict: true }).doc;
+  const TAG = '"v1"';
+
+  /** An origin that honours If-None-Match — weakly, as RFC 9110 requires, or not. */
+  const origin = (weakCompare: boolean): { transport: Transport; sent: HttpRequest[] } => {
+    const sent: HttpRequest[] = [];
+    const strip = (t: string): string => (weakCompare ? t.replace(/^W\//, "") : t);
+    const transport: Transport = async (req) => {
+      sent.push(req);
+      const inm = req.headers["If-None-Match"];
+      if (inm !== undefined && strip(inm) === TAG) return { status: 304, headers: { ETag: TAG }, body: "" };
+      return { status: 200, headers: { ETag: TAG }, body: "{}" };
+    };
+    return { transport, sent };
+  };
+
+  const good = origin(true);
+  const pass = await runFlow(doc, { transport: good.transport });
+  ok("a correct origin passes the conditional GET flow", pass.ok, pass.steps.find((s) => !s.ok)?.error);
+  eq("the captured ETag was replayed verbatim", good.sent[1]?.headers["If-None-Match"], TAG);
+  eq("and weakened for the weak replay", good.sent[2]?.headers["If-None-Match"], `W/${TAG}`);
+
+  // The Flock bug: an origin comparing ETags exactly answers 200 to the weak
+  // tag an edge rewrote — every client re-downloads. The flow catches it.
+  const buggy = await runFlow(doc, { transport: origin(false).transport });
+  ok("an exact-match origin fails the weak replay", !buggy.ok);
+  eq("at replayWeak", buggy.steps.find((s) => !s.ok)?.nodeId, "replayWeak");
+}
+
 // 6. chooseEdge ------------------------------------------------------------
 {
   const edges = [
