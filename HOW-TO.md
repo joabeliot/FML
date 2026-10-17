@@ -537,6 +537,40 @@ mistakes that only bite once you actually run something:
 Note what is deliberately *not* flagged: `expect: 200` on a node that also
 draws `-404>`. That pairing is the idiom, not a contradiction.
 
+### Checking flows against the API's spec — drift
+
+A flow can describe an endpoint the API never had, or one that changed after
+the flow was written. If the API publishes an OpenAPI (3.x) or Swagger (2.0)
+spec, compare the two:
+
+```bash
+npm run drift -- examples/conditional-get.fml openapi.json
+npm run drift -- app.fml openapi.yaml --coverage   # also list untested operations
+npm run drift -- app.fml openapi.yaml --json       # machine-readable
+```
+
+Every `api` node, including ones in `@fof` imports and in every `@doc`, is
+matched by method and path. `{param}` segments match anything on either side,
+and the spec's `basePath` / `servers` prefix and your `base` path prefix are
+both taken into account.
+
+| finding | severity | means |
+|---|---|---|
+| no path in the spec matches | error | the endpoint doesn't exist — the flow is wrong or the API moved |
+| path exists, method doesn't | error | e.g. the flow `PUT`s what the spec only `GET`s |
+| status not documented | warning | the flow `expect`s or draws a `-404>` the spec never lists |
+| no path or url | warning | nothing to compare |
+
+The command exits 1 only when there are errors, so it can run in CI. Warnings
+are often the spec being incomplete rather than the flow being wrong. For
+example, httpbin's own spec doesn't list the `304` that
+`examples/conditional-get.fml` depends on. If the spec names a host, nodes
+calling a *different* host (a multi-host flow) are skipped and counted, not
+flagged. A host built from a `{var}` can't be ruled out, so it's checked.
+
+The spec has to be a local file in JSON or YAML. Download it first; the
+command doesn't fetch URLs.
+
 ### Running a flow from the app
 
 The canvas has a **▶ Run** button (only enabled when the active doc has an
