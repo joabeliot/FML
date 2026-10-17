@@ -1,21 +1,30 @@
-# Test Registry — protoarque
+# Test Registry — F*ML
 
-> Stub — populate as tests are written.
+`npm test` runs every suite below in order; each is a plain Node script
+(`node <file>`), no framework. `npm run build` (tsc + vite) is the other gate.
 
 ## Covered
 
 | Area | Test file | Type | Notes |
 |------|-----------|------|-------|
-| — | — | — | No tests yet |
+| Parser | `src/fml/parse.test.ts` | unit | sections, `@doc`/`@fof`, edge notes, strict mode |
+| Stats | `src/fml/stats.test.ts` | unit | flows, entry points, terminals |
+| Variables | `src/fml/variables.test.ts` | unit | `{name}` resolution, `@vars`, captures |
+| Engine | `src/fml/run.test.ts` | unit, fake transport | interpolation, `readPath` (incl. `.length`, `body.sha256`/`body.bytes`), status matching, request building, captures, `assert.*` grammar + evaluation, header asserts (weak ETag), conditional GET against fake origins, Range/206/416, routing, guards |
+| Lint | `src/fml/lint.test.ts` | unit | typo'd keys, base checks, malformed asserts, listed examples lint clean |
+| Run report | `src/fml/report.test.ts` | unit, fake transport | report shape, failure classification, value-based redaction, body truncation, `.fml.env` parsing |
+| Write-back | `src/lib/fmlEdit.test.ts` | unit | targeted text surgery survives comments/formatting |
+
+Live checks (network, not in `npm test`): `node scripts/run.ts` on
+`examples/run.fml`, `multi-host.fml`, `branching.fml`, `conditional-get.fml`,
+`bytes.fml` should PASS; `examples/assertions.fml` should FAIL at `getPosts`
+(on purpose).
 
 ## Not Covered
 
-- Node creation and positioning
-- Edge drawing between nodes
-- Acquired state toggle
-- localStorage save/load
-- JSON export/import
-- Canvas pan/zoom behavior
+- React components and hooks (canvas, property panel, run bar)
+- `scripts/run.ts` CLI flag handling (exercised by hand only; type-checked by `tsc -b`)
+- Browser transports (`src/lib/httpTransport.ts`) — the dev proxy was checked by hand
 
 ## Known Gaps
 

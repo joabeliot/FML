@@ -21,7 +21,8 @@ interface ProxyOk {
   ok: true;
   status: number;
   headers: Record<string, string>;
-  body: string;
+  /** The raw body, base64 — JSON can't carry bytes, and text decoding is lossy. */
+  bodyBase64: string;
 }
 interface ProxyErr {
   ok: false;
@@ -40,7 +41,8 @@ async function viaProxy(req: HttpRequest, signal?: AbortSignal): Promise<HttpRes
   });
   const payload = (await res.json()) as ProxyOk | ProxyErr;
   if (!payload.ok) throw new Error(payload.error);
-  return { status: payload.status, headers: payload.headers, body: payload.body };
+  const bytes = Uint8Array.from(atob(payload.bodyBase64), (c) => c.charCodeAt(0));
+  return { status: payload.status, headers: payload.headers, body: new TextDecoder().decode(bytes), bytes };
 }
 
 async function direct(req: HttpRequest, signal?: AbortSignal): Promise<HttpResponse> {
@@ -67,7 +69,8 @@ async function direct(req: HttpRequest, signal?: AbortSignal): Promise<HttpRespo
   res.headers.forEach((v, k) => {
     headers[k] = v;
   });
-  return { status: res.status, headers, body: await res.text() };
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return { status: res.status, headers, body: new TextDecoder().decode(bytes), bytes };
 }
 
 /** The transport to hand `runFlow` from inside the app. */

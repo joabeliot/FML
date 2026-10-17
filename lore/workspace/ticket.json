@@ -7,7 +7,7 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P0",
       "tags": [
         "setup",
@@ -15,14 +15,29 @@
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.693427+00:00",
           "event": "created",
           "detail": "PAQ-1"
+        },
+        {
+          "at": "2026-10-17T07:59:07.674999+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.679860+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built — Vite 6 + React 19 + TS strict (package.json, tsconfig*.json)."
+        },
+        {
+          "at": "2026-10-17T07:59:07.683853+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -32,7 +47,7 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P0",
       "tags": [
         "setup",
@@ -40,14 +55,29 @@
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.700098+00:00",
           "event": "created",
           "detail": "PAQ-2"
+        },
+        {
+          "at": "2026-10-17T07:59:07.687435+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.690773+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built — @xyflow/react v12 is the canvas engine (src/components/FlowCanvas.tsx)."
+        },
+        {
+          "at": "2026-10-17T07:59:07.694006+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -57,7 +87,7 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P0",
       "tags": [
         "setup",
@@ -65,14 +95,29 @@
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.705024+00:00",
           "event": "created",
           "detail": "PAQ-3"
+        },
+        {
+          "at": "2026-10-17T07:59:07.697163+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.700131+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built — Tailwind v4 via @tailwindcss/vite, @theme tokens in src/index.css."
+        },
+        {
+          "at": "2026-10-17T07:59:07.703013+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -82,7 +127,7 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "infra",
@@ -90,14 +135,29 @@
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.709278+00:00",
           "event": "created",
           "detail": "PAQ-4"
+        },
+        {
+          "at": "2026-10-17T07:59:07.705935+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.708644+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built — firebase.json + .firebaserc, project protoarch serving dist/, deployed."
+        },
+        {
+          "at": "2026-10-17T07:59:07.711204+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -107,21 +167,36 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "canvas"
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.713824+00:00",
           "event": "created",
           "detail": "PAQ-5"
+        },
+        {
+          "at": "2026-10-17T07:59:07.713888+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.716418+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built — FlowCanvas pans/zooms (panOnScroll, pinch zoom, minZoom 0.2, Controls, fitView)."
+        },
+        {
+          "at": "2026-10-17T07:59:07.719100+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -131,21 +206,36 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "nodes"
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.718090+00:00",
           "event": "created",
           "detail": "PAQ-6"
+        },
+        {
+          "at": "2026-10-17T07:59:07.721939+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.724567+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: obsolete — the protoarque 'acquired' tech-tree node was dropped in the FML pivot; typed nodes are src/components/nodes/FmlNode.tsx + BubbleNode.tsx."
+        },
+        {
+          "at": "2026-10-17T07:59:07.727358+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -155,7 +245,7 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "nodes",
@@ -163,14 +253,29 @@
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.722228+00:00",
           "event": "created",
           "detail": "PAQ-7"
+        },
+        {
+          "at": "2026-10-17T07:59:07.730060+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.732637+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: superseded — nodes come from .fml text; Sidebar lists them by type. Adding nodes from the UI is FML-22."
+        },
+        {
+          "at": "2026-10-17T07:59:07.735224+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -180,21 +285,36 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "edges"
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.726253+00:00",
           "event": "created",
           "detail": "PAQ-8"
+        },
+        {
+          "at": "2026-10-17T07:59:07.738205+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.740882+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: superseded — edges are drawn from @flow text (nodesConnectable=false by design until write-back exists). Adding/deleting edges from the UI is FML-22."
+        },
+        {
+          "at": "2026-10-17T07:59:07.743495+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -204,21 +324,36 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "persistence"
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.730533+00:00",
           "event": "created",
           "detail": "PAQ-9"
+        },
+        {
+          "at": "2026-10-17T07:59:07.746239+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.749039+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: built in FML form — workspace {files, entry} persists to localStorage (App.tsx protoarque_fml_ws), files import via Toolbar picker, entry file downloads as .fml."
+        },
+        {
+          "at": "2026-10-17T07:59:07.752004+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -228,21 +363,36 @@
       "description": "",
       "context": [],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "ui"
       ],
       "source": "Agent",
       "created": "2026-07-24",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-07-24T12:19:16.735207+00:00",
           "event": "created",
           "detail": "PAQ-10"
+        },
+        {
+          "at": "2026-10-17T07:59:07.754882+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:59:07.757505+00:00",
+          "event": "log",
+          "detail": "Closed on review 2026-10-17: obsolete — Toolbar exists (src/components/Toolbar.tsx) but a select/connect/pan mode switch isn't needed: pan/select are direct, and connecting belongs to FML-22."
+        },
+        {
+          "at": "2026-10-17T07:59:07.760085+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -257,7 +407,7 @@
         "src/fml/nodeTypes.ts"
       ],
       "plan": null,
-      "status": "todo",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "execution",
@@ -267,14 +417,24 @@
       ],
       "source": "Claude",
       "created": "2026-10-09",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-09T10:57:33.172468+00:00",
           "event": "created",
           "detail": "PAQ-11"
+        },
+        {
+          "at": "2026-10-17T07:42:51.081088+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:46:46.259164+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -288,7 +448,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -296,14 +456,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.889826+00:00",
           "event": "created",
           "detail": "FML-12"
+        },
+        {
+          "at": "2026-10-17T07:42:51.063529+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:46:46.261953+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:47:06.342478+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -317,7 +492,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "runner",
@@ -325,14 +500,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.896508+00:00",
           "event": "created",
           "detail": "FML-13"
+        },
+        {
+          "at": "2026-10-17T07:42:51.067381+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:47:55.433481+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:49:42.052548+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -346,7 +536,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -354,14 +544,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.901447+00:00",
           "event": "created",
           "detail": "FML-14"
+        },
+        {
+          "at": "2026-10-17T07:42:51.070932+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:47:06.345603+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:47:55.430329+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -375,7 +580,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P1",
       "tags": [
         "runner",
@@ -383,14 +588,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.906193+00:00",
           "event": "created",
           "detail": "FML-15"
+        },
+        {
+          "at": "2026-10-17T07:42:51.074266+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:49:42.055473+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:51:56.847188+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
@@ -433,7 +653,7 @@
         "ideas/flow-execution.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -441,14 +661,29 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.915373+00:00",
           "event": "created",
           "detail": "FML-17"
+        },
+        {
+          "at": "2026-10-17T07:42:51.077838+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T07:51:56.849880+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T07:53:37.284050+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },

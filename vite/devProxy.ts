@@ -69,7 +69,10 @@ export function fmlDevProxy(): Plugin {
             });
             // Always a 200 from the proxy itself — the *target's* status is
             // data, so a 404 upstream never gets confused with a broken proxy.
-            send(res, { ok: true, status: target.status, headers, body: await target.text() });
+            // Base64, not text: a body hashed with `body.sha256` must arrive
+            // byte-for-byte, and decoding binary as UTF-8 would mangle it.
+            const bodyBase64 = Buffer.from(await target.arrayBuffer()).toString("base64");
+            send(res, { ok: true, status: target.status, headers, bodyBase64 });
           } catch (err) {
             send(res, { ok: false, error: err instanceof Error ? err.message : String(err) });
           }

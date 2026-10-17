@@ -124,7 +124,7 @@ Each type has keys it is expected to carry, and keys that are merely useful:
 | type | expected | also understood |
 |---|---|---|
 | `page` | — | `route`, `title`, `image`, `note` |
-| `api` | `method`, `path` (or `url`) | `body`, `auth`, `expect`, `header.<Name>`, `query.<name>`, `capture.<var>`, `note` |
+| `api` | `method`, `path` (or `url`) | `base`, `body`, `auth`, `expect`, `header.<Name>`, `query.<name>`, `capture.<var>`, `assert.<path>`, `note` |
 | `decision` | — | `condition`, `note` |
 | `event` | — | `source`, `payload`, `note` |
 | `flow` | `doc` | `note` |
@@ -216,14 +216,17 @@ sends. See [Running a flow](#running-a-flow) below.
 
 - `path` resolves against `@meta base:` — or the node's own `base:`, see
   below; `url` is a full URL instead and ignores both.
-- `header.<Name>`, `query.<name>` and `capture.<var>` are **dotted keys** — the
-  suffix is the header/param/variable name, so each can appear any number of
-  times in one block.
+- `header.<Name>`, `query.<name>`, `capture.<var>` and `assert.<path>` are
+  **dotted keys** — the suffix is the header/param/variable name (or, for
+  `assert`, the path to check), so each can appear any number of times in one
+  block.
 - `{name}` is a **variable reference**. `capture.token: $.data.token` pulls a
   value out of one response so a later node can spend it as `{token}`.
 - `auth:` is sugar over the Authorization header — `none` sends nothing,
   `bearer {token}` sends `Bearer <value>`, anything else is sent literally.
 - `expect:` is the status assertion — `200`, `200,201`, `2xx`, or `200-204`.
+- `assert.<path>:` checks the response *body* — see
+  [Body assertions](#body-assertions--assertpath) below.
 
 `{name}` is also resolved *statically*: click a node and its **About** tab lists
 every variable it references and where the value comes from. See below.
@@ -271,6 +274,139 @@ resolves against the doc-level `base`, or its own override if it has one:
   on a failure, which is usually a host mismatch, not a broken request. See
   `examples/multi-host.fml`.
 
+### Body assertions — `assert.<path>`
+
+`expect` only checks the status. A 200 with the wrong number in the body still
+passes it — FML confirmed the API answered, not that it said the right thing.
+`assert.<path>` reads a value out of the response and compares it:
+
+```
+@node income {
+  method: GET
+  path: /income
+  capture.rate: $.data.income_rate
+  expect: 200
+  assert.data.income_rate: ~11900+-50     # within 50 either way
+  assert.sources.length: >= 2             # .length on an array
+  assert.data.status: active              # exact match
+  assert.data.error: absent
+  assert.first: $.items[0].id == {firstId}
+}
+```
+
+**The suffix is the path**, in the same syntax `capture` reads (see the table
+under [Running a flow](#running-a-flow)): `data.income_rate`, `status`,
+`header.ETag`. Keys can't contain `$`, `[` or `]`, so when you need an array
+index or the body's root, **start the value with a `$` path** — the first word
+is then the path, and the suffix is just a label for messages:
+`assert.first: $.items[0].id == a`. Use `$.` too for a body field literally
+named `status` or `header`, which would otherwise read the HTTP status or a
+header.
+
+| comparison | passes when |
+|---|---|
+| `active` or `== active` | exact — compared as numbers when both sides are numbers (`7` equals `7.0`) |
+| `"7"` | quoted: an exact *string* match (also the escape for a value that starts with `>` or `~`) |
+| `!= x` | not equal, same rules as exact |
+| `>= 2`, `<= 2`, `> 2`, `< 2` | numeric comparison |
+| `~11900+-50` | within an absolute tolerance |
+| `~11900+-1%` | within a relative tolerance |
+| `matches ^W/"` | the value matches a JavaScript regular expression |
+| `exists` / `absent` | the path leads somewhere / nowhere |
+
+There's **no default tolerance**: a bare `~11900` is a lint warning and fails
+the step. A hidden 1% is exactly what you forget about when a test goes red.
+
+**Headers** are paths too, and case-insensitive — this is where `matches`,
+`exists` and `absent` earn their keep:
+
+```
+  assert.header.ETag: matches ^"[^"]+"$      # strong ETag, not W/"…"
+  assert.header.Cache-Control: exists
+  assert.header.Set-Cookie: absent
+```
+
+`{name}` works on the right-hand side — including a value this same node just
+captured, because captures run first, then `expect`, then asserts.
+
+**A failed assert behaves exactly like a failed `expect`.** The step and the
+run go red, but the walk still follows the drawn edge so you see the rest of
+the path; `--fail-fast` stops at it instead. The step log prints every assert
+with ✔/✖ and what actually came back. See `examples/assertions.fml`, which
+fails on purpose.
+
+### Bytes — hashes, lengths, ranges
+
+For media, a 200 proves nothing; the bytes have to be the right bytes.
+`body.sha256` is the lowercase hex SHA-256 of the raw body and `body.bytes` is
+its length in bytes. Both read the bytes as they came off the wire, so binary
+bodies hash correctly. Keep the expected hash in a variable:
+
+```
+@vars
+  coverHash: 8d8bfac911cdfa1e804c07422282669d1dcf9888bc56b9b6cae11e54e960b04b
+
+@node cover {
+  method: GET
+  path: /media/cover.jpg
+  expect: 200
+  assert.body.sha256: {coverHash}
+  assert.body.bytes: == 48213
+}
+
+@node firstChunk {
+  method: GET
+  path: /media/cover.jpg
+  header.Range: bytes=0-1023
+  expect: 206
+  assert.body.bytes: == 1024
+  assert.header.Content-Range: matches ^bytes 0-1023/
+}
+```
+
+`header.Range` is an ordinary header, so `206` (partial) and `416` (range not
+satisfiable) are just `expect` values. `capture.hash: body.sha256` works too,
+to compare two downloads. `body.sha256` and `body.bytes` are reserved: for a
+JSON field at `body.bytes`, write `$.body.bytes`. Full flow:
+`examples/bytes.fml`.
+
+### Conditional GET — ETag in, 304 out
+
+No special syntax: capture the `ETag` header, send it back as
+`If-None-Match`, expect `304`.
+
+```
+@node fetch {
+  method: GET
+  path: /media/{id}
+  capture.etag: header.ETag
+  expect: 200
+}
+
+@node replay {
+  method: GET
+  path: /media/{id}
+  header.If-None-Match: {etag}
+  expect: 304
+  assert.emptyBody: $ == ""
+}
+
+@node replayWeak {
+  method: GET
+  path: /media/{id}
+  header.If-None-Match: W/{etag}       # what an edge/CDN may rewrite it to
+  expect: 304
+}
+```
+
+The weak replay is the one worth having. A CDN may legally turn a strong ETag
+into a weak `W/"…"` one, and `If-None-Match` is defined to use *weak*
+comparison — so the origin must still say 304. An origin that compares
+exactly says 200, and every client re-downloads every time. Add a replay with
+a tag the server never issued, expecting 200, so a server that always answers
+304 can't pass either. Full flow: `examples/conditional-get.fml` (runs against
+httpbin.org).
+
 ### Running a flow
 
 ```bash
@@ -308,18 +444,36 @@ cared about — two different reasons for that:
 | `$` | the whole body, verbatim |
 | `status` | the status code |
 | `header.<Name>` | a response header, case-insensitive |
+| `$.items.length` | an array's length (only as the last segment) |
+| `body.sha256` | lowercase hex SHA-256 of the raw body bytes |
+| `body.bytes` | the body's length in bytes |
 
 A capture that finds nothing **fails the step** — a silently-empty `{token}`
 is the worst outcome a test run can have.
 
 **Supplying run-time inputs.** A `{name}` with no `@vars` default and no
 `capture` is an input you pass in — that's the point of leaving secrets out of
-the file:
+the file. Four places, lowest precedence first:
 
 ```bash
-FML_VAR_password=… node scripts/run.ts login.fml     # preferred
-node scripts/run.ts login.fml --var password=…       # lands in shell history
+# 1. a .fml.env beside the flow (gitignored), or --secrets <file>
+#      memberToken=eyJhbGciOi…
+#      export appCheck="abc 123"      # export / quotes optional, # comments ok
+node scripts/run.ts login.fml
+
+FML_VAR_email=jb@arque.app node scripts/run.ts login.fml     # 2. plain input
+FML_SECRET_password=… node scripts/run.ts login.fml         # 3. secret input
+node scripts/run.ts login.fml --var email=jb@arque.app      # 4. lands in shell history
 ```
+
+Anything from a secrets file or `FML_SECRET_` is a **secret by declaration** —
+its value is replaced with `[redacted:<name>]` everywhere the CLI prints:
+the step log, the `--dry` plan and the `--json` report, including inside URLs,
+bodies and a later capture that echoed it back. Variables whose *name* looks
+secret (`token`, `password`, `key`, `auth`, `session`, …) are treated the same
+way without being declared, captured ones included. `.fml.env` and
+`*.fml.env` are in `.gitignore`; an explicit `--secrets` path that doesn't
+exist is an error rather than a silent no-op.
 
 The run refuses to start if any are missing, and refuses to *send* a request
 that still contains an unresolved `{name}` — a literal `{token}` in a header is
@@ -333,7 +487,40 @@ never went out (missing variable, dead host) always stops the walk: there's no
 status to route on.
 
 **Flags:** `--doc <name>` picks a doc, `--start <nodeId>` starts elsewhere,
-`--fail-fast` stops at the first failed step, `--json` dumps the whole run.
+`--fail-fast` stops at the first failed step, `--json` prints the run report
+instead of the step log, `--report <file>` writes the report and keeps the log.
+
+**The run report** (`--json` / `--report`) is for whatever reads the result
+next — CI, a script, another agent writing the fix. Its `failure` field is the
+first thing that went wrong, already classified:
+
+```json
+{
+  "schema": 1,
+  "ok": false,
+  "summary": { "steps": 4, "requests": 2, "passed": 1, "failed": 1 },
+  "failure": {
+    "kind": "assert",
+    "nodeId": "getPosts",
+    "message": "getPosts: assert.count expected >= 12, got 10",
+    "assertion": { "label": "count", "path": "$.length", "expr": "$.length >= 12", "actual": "10", "ok": false },
+    "request": { "method": "GET", "url": "https://…/posts?userId=1", "headers": {} },
+    "response": { "status": 200, "headers": { "…": "…" }, "body": "[…]", "bodyBytes": 27520 }
+  },
+  "steps": [ "… every step, same shape, with captures, asserts and durationMs …" ],
+  "vars": { "username": "Bret" }
+}
+```
+
+`kind` is one of `request` (nothing was sent — missing variable, no base,
+dead host), `status`, `capture`, `assert`, `unmodelled`, `ambiguous` or
+`maxSteps`. Bodies over 64 KiB are cut, with `bodyTruncated: true` and the
+real `bodyBytes`. **Secrets are redacted by value**: everything from a secrets
+file or `FML_SECRET_` (see above), plus every supplied or captured variable
+whose name looks secret (`token`, `password`, `key`, `auth`,
+`session`, …) is replaced with `[redacted:<name>]` wherever it shows up — URL,
+header, body, a later capture. `Authorization`, `Cookie`, `Set-Cookie` and
+`X-Api-Key` headers are always hidden.
 
 ### Checking a file before you run it
 
@@ -344,6 +531,7 @@ mistakes that only bite once you actually run something:
 - `path` with no `base` (on the node or `@meta`) to resolve against
 - a method that isn't an HTTP verb, an `expect` that isn't a status pattern
 - `capture.x:` with no path — it would never capture anything
+- a malformed `assert` — `~N` with no tolerance, `>= lots`, a bad regex
 - `{name}`s that are run-time inputs (shown with `--all`)
 
 Note what is deliberately *not* flagged: `expect: 200` on a node that also
@@ -657,7 +845,10 @@ per journey, assembled at the top of the entry file:
   warning, though — that's the typo catcher (`heder.Accept` never sending is
   a worse surprise than a warning).
 - **Key charset is `[A-Za-z0-9_.-]`.** The `.` is what makes `header.Accept`,
-  `query.page` and `capture.token` work.
+  `query.page` and `capture.token` work. It's also why `assert` takes a `$`
+  path in its *value* for anything with `[0]` in it.
+- **`#` starts a comment, even inside a value** — so a `matches` pattern can't
+  contain one yet.
 - **Blank lines are ignored today.** Use them to visually group related flows;
   a future version will treat a blank line as a boundary between separate
   diagrams, so organising with them now is future-proof.

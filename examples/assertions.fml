@@ -1,0 +1,55 @@
+# assertions.fml — scoring what the response SAID, not just that it answered.
+#
+#   node scripts/run.ts examples/assertions.fml      # FAILS, on purpose
+#
+# `expect` checks the status. A 200 with the wrong number in the body still
+# passes it — that's a smoke test, not a correctness test. `assert.<path>`
+# reads a value out of the response (same paths as `capture`) and compares it.
+#
+# `getPosts` below is wrong on purpose: jsonplaceholder's user 1 has 10 posts,
+# and the flow asserts 12. Its status is a perfectly good 200 — only the assert
+# catches it. The step goes red and the run still walks on to `Done`, exactly
+# like a failed `expect` does; `--fail-fast` would stop there instead.
+
+@meta
+  title: Body assertions — a 200 that's still wrong
+  base: https://jsonplaceholder.typicode.com
+
+@vars
+  userId: 1
+
+@nodes
+  Start     = page
+  getUser   = api
+  getPosts  = api
+  Done      = page
+
+@node getUser {
+  method: GET
+  path: /users/{userId}
+  capture.username: $.username
+  expect: 200
+  assert.id: == {userId}
+  assert.username: Bret
+  assert.address.geo.lat: ~-37.3+-0.1
+  assert.company.name: matches ^Romaguera
+  assert.deletedAt: absent
+}
+
+# The suffix is the path. A value that starts with `$` names its own path
+# instead — needed for array indexes and for the root of the body, which a
+# key can't spell. `.length` on an array is its length.
+
+@node getPosts {
+  method: GET
+  path: /posts
+  query.userId: {userId}
+  expect: 200
+  assert.firstPost: $[0].userId == {userId}
+  assert.count: $.length >= 12
+}
+
+@flow
+  Start -run> getUser
+  getUser -200> getPosts
+  getPosts -200> Done

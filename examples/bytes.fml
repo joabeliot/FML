@@ -1,0 +1,61 @@
+# bytes.fml — checking the bytes themselves: hash, length, ranges.
+#
+#   node scripts/run.ts examples/bytes.fml
+#
+# For media, "it returned 200" means nothing — what matters is that the file
+# that came back is the file you stored. `body.sha256` is the lowercase hex
+# SHA-256 of the raw body, `body.bytes` its length in bytes. Both read the bytes
+# off the wire, not decoded text, so binary works (`seededBlob` below is 64
+# random bytes that aren't valid UTF-8 — hashing the text would get it wrong).
+#
+# Ranges need nothing new: send `header.Range`, expect 206 (or 416 past the
+# end), and assert on `header.Content-Range`.
+
+@meta
+  title: Bytes — sha256, length, and Range requests
+  base: https://httpbin.org
+
+@vars
+  blobHash: 8d8bfac911cdfa1e804c07422282669d1dcf9888bc56b9b6cae11e54e960b04b
+  firstTenHash: 72399361da6a7754fec986dca5b7cbaf1c810a28ded4abaf56b2106d06cb78b0
+
+@nodes
+  Start       = page
+  seededBlob  = api
+  firstTen    = api
+  pastTheEnd  = api
+  Done        = page
+
+@node seededBlob {
+  method: GET
+  path: /bytes/64
+  query.seed: 7
+  expect: 200
+  assert.body.sha256: {blobHash}
+  assert.body.bytes: == 64
+}
+
+# /range/26 serves "abcdefghijklmnopqrstuvwxyz"; ask for the first ten.
+
+@node firstTen {
+  method: GET
+  path: /range/26
+  header.Range: bytes=0-9
+  expect: 206
+  assert.body.sha256: {firstTenHash}
+  assert.body.bytes: == 10
+  assert.header.Content-Range: bytes 0-9/26
+}
+
+@node pastTheEnd {
+  method: GET
+  path: /range/26
+  header.Range: bytes=100-200
+  expect: 416
+}
+
+@flow
+  Start -run> seededBlob
+  seededBlob -200> firstTen
+  firstTen -206> pastTheEnd
+  pastTheEnd -416> Done

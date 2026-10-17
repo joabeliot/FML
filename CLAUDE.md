@@ -32,6 +32,8 @@ into the source file.
 | `src/fml/nodeTypes.ts` | The canonical node vocabulary (`page`/`api`/`decision`/`event`/`flow`) and their expected keys. Changing it changes the language. |
 | `src/fml/variables.ts` | `{name}` resolution — `@vars` defaults + `capture.<name>` on an earlier node in the same doc. Per-doc scope; cross-doc (through a `flow` portal) is an open question, not decided. |
 | `src/fml/run.ts` | The execution engine — sends `api` nodes, threads `capture`d values, asserts `expect`, routes on status. **Takes its transport as an argument** — never call the network from in here, that's what keeps it testable and CORS-agnostic. |
+| `src/fml/assert.ts` | The `assert.<path>` comparison grammar — parse (for lint) and evaluate (for the runner). |
+| `src/fml/report.ts` | The machine-readable run report (`--json`/`--report`) and value-based secret redaction. Pure — the CLI decides where it goes. |
 | `scripts/run.ts` | CLI runner (`npm run run-flow -- <file.fml>`). Node has no CORS, so flows execute today. `--dry` prints the request plan. |
 | `src/fml/lint.ts` | Semantic checks on a parsed doc — typo'd keys, unrunnable paths, malformed `expect`. Keyed by node id, not line, so the canvas can point at them. |
 | `src/lib/httpTransport.ts` | The browser's transport. Dev routes through `vite/devProxy.ts`; the built site calls `fetch` directly and therefore only reaches CORS-permissive APIs. |
@@ -44,9 +46,9 @@ into the source file.
 
 ## Working rules
 
-- **Run `npm test` and `npm run build` before saying anything works.** Six
+- **Run `npm test` and `npm run build` before saying anything works.** Seven
   suites: `src/fml/parse.test.ts`, `stats.test.ts`, `variables.test.ts`,
-  `run.test.ts`, `lint.test.ts`, `src/lib/fmlEdit.test.ts`.
+  `run.test.ts`, `lint.test.ts`, `report.test.ts`, `src/lib/fmlEdit.test.ts`.
 - **`npm run demo -- <file>` is the structural check** when you can't see the canvas.
 - **Language changes ripple.** A new node type or key touches the parser, the
   renderer, the property panel, `HOW-TO.md` and the examples. Do all of them.
