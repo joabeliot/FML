@@ -742,7 +742,7 @@
         "ideas/ui-steps.md"
       ],
       "plan": null,
-      "status": "backlog",
+      "status": "done",
       "priority": "P2",
       "tags": [
         "runner",
@@ -750,9 +750,9 @@
       ],
       "source": "Flock v2 audit 2026-10-13",
       "created": "2026-10-13",
-      "assigned_to": null,
-      "started_at": null,
-      "completed_at": null,
+      "assigned_to": "claude",
+      "started_at": "2026-10-17",
+      "completed_at": "2026-10-17",
       "logs": [
         {
           "at": "2026-10-13T08:47:55.924339+00:00",
@@ -763,6 +763,21 @@
           "at": "2026-10-17T09:31:44.482820+00:00",
           "event": "context_added",
           "detail": "ideas/ui-steps.md"
+        },
+        {
+          "at": "2026-10-17T09:43:03.561031+00:00",
+          "event": "scheduled",
+          "detail": null
+        },
+        {
+          "at": "2026-10-17T09:43:03.564043+00:00",
+          "event": "started",
+          "detail": "claude"
+        },
+        {
+          "at": "2026-10-17T09:48:21.734096+00:00",
+          "event": "completed",
+          "detail": null
         }
       ]
     },
