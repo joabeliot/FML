@@ -653,6 +653,45 @@ screenshot path.
 ` #submit` in a selector. (`button#submit`, with no space before `#`, is
 fine.)
 
+### Stopping for a person — `ask.<name>` and `pause`
+
+Some flows can't run end to end without someone: a code texted to a phone, an
+email link to click, a captcha. Any node can stop the run before it acts:
+
+```fml
+@node verify {
+  method: POST
+  path: /verify
+  pause: Check your phone for the code
+  ask.otp: The 6-digit code we texted you
+  body: {"code":"{otp}"}
+}
+```
+
+- `ask.<name>: <prompt>` asks a person for `{name}`. The answer is there for
+  this node and every one after, like a capture. It's never written to the
+  file, and an asked name doesn't count as a missing input before the run.
+- `pause: <message>` waits until the person says go on. An empty `pause:`
+  works too.
+- The pause comes first, then the asks in the order written. A prompt can
+  quote what the run knows so far: `pause: Look up {username}'s posts?`.
+- **Supplied up front, not asked.** If `{otp}` already has a value from
+  `--var`, `.fml.env` or the run dialog, the node doesn't ask. That's how
+  CI runs the same flow.
+- **In the app** a dialog appears mid-run (the bar says WAITING FOR YOU).
+  Continue carries on and **Stop run** ends it, which counts as a FAIL that
+  says where you stopped. A secret-looking name (`otp`, `password`, `token`,
+  `code`…) gets a masked field.
+- **In the CLI** it asks on the terminal, with prompts going to stderr so
+  `--json` stays clean. Secret-looking answers aren't echoed and are redacted
+  like any secret. At a pause, Enter goes on and `q` stops. `--yes`
+  continues past pauses without asking. Off a terminal (CI) there's nobody
+  to ask, so the step fails and says to use `--var name=…` or `--yes`. Set
+  `FML_ASK=stdin` to pipe answers in. The report records what was asked and
+  how long it waited (`steps[].asked`), never the answer.
+
+See `examples/ask.fml`.
+
 ### Running a flow from the app
 
 The canvas has a **▶ Run** button (only enabled when the active doc has an
@@ -899,17 +938,37 @@ FML, with different node types and a different meaning for arrows:
 | `fml` | the `.fml` that proves it; opens in the flow view if it's loaded |
 | `ticket` | lore ticket ids, comma-separated, shown as references |
 
-Switch to **Roadmap** at the top of the canvas, then open a `.rml` file (or
-load the example, `examples/roadmap.rml`, which is F*ML's own roadmap).
+| `icon` | the tile's icon: `flag`, `star`, `bolt`, `gear`, `shield`, `key`, `link`, `eye`, `chart`, `map`, `book`, `bug`, `rocket`, `cube`, `code`, `play`, `check`, `layers`, `hammer`, `flask` (or an emoji); left out, one is picked for you |
+
+Switch to **Roadmap** at the top of the canvas, then open a `.rml` file,
+start a **New roadmap**, or load the example (`examples/roadmap.rml`, which
+is F*ML's own roadmap).
+
+It's drawn as a game skill tree. Roots sit at the centre and each branch
+grows outward, one grid step at a time, so lines run straight or at 45°.
+Square tiles are features (bigger when they unlock three or more things);
+diamonds are milestones. Each `area` gets its own colour.
 
 - **Done** tiles are lit in their area's colour, and **active** ones are lit
-  with a gold ring.
+  with a glowing gold edge.
 - A pending tile whose dependencies are all done is **ready**: dark, with a
-  coloured outline and a `NEXT` tag. That's your frontier.
-- Everything else is **locked**.
-- Connectors turn gold once their prerequisite is done.
-- Click a tile to change its status (written straight into the file, ⌘Z to
-  undo) and to follow its flows, tickets, and what it depends on and unlocks.
+  coloured edge and a `NEXT` tag. That's your frontier.
+- Everything else is **locked** and dim.
+- Lines turn gold once their prerequisite is done.
+
+**Editing** (everything is written straight into the `.rml`; ⌘Z undoes):
+
+- **+ Feature / + Milestone** in the bottom bar adds a tile. With a tile
+  selected, the new one is what that tile unlocks.
+- **Connect** by hovering a tile and dragging its gold handle onto another:
+  the tile you drop on now depends on the one you dragged from. A link that
+  would make a loop is refused.
+- **Click a tile** to edit it in the panel: id (renamed everywhere), kind
+  (feature ↔ milestone), status, title, description, area, icon, the flows
+  that prove it, tickets, and its dependencies (**+ add** one, **×** to drop
+  one).
+- **Delete** with the panel's button or ⌫ / Delete removes the tile and its
+  links.
 
 The footer flags a status outside the three, a key RML doesn't know, and
 dependency cycles.
@@ -1105,8 +1164,9 @@ What the viewer gives you beyond the picture:
   - **⌘Z / Ctrl+Z** undoes the last of these edits.
 - **See where values flow (data wires).** Each `capture.<name>` is an output
   port on the right of its card, and each `{name}` a node uses is an input
-  port on the left. A dashed orange wire joins the node that captures a value
-  to every node that uses it. Selecting a node shows its wires; the **Data**
+  port on the left. Ports are always shown, so there's always something to
+  connect to. A dashed orange wire joins the node that captures a value to
+  every node that uses it. Selecting a node shows its wires; the **Data**
   toolbar button shows them all. Input ports also show where the value comes
   from:
   - **filled:** captured by a node
@@ -1116,6 +1176,17 @@ What the viewer gives you beyond the picture:
   on another card. Then pick where `{name}` should go: appended to one of the
   card's fields, `auth: bearer {name}`, `query.<name>`, or a new key you type.
   It's the same text you'd have typed yourself. ⌘Z undoes it.
+  Drop it **on an input port** instead and that reference is repointed:
+  dropping `{code}` on a node's `otp` port turns every `{otp}` in that node
+  into `{code}`.
+- **Variables are nodes.** Every `@vars` entry, and every value nothing in
+  the file supplies (a run-time input, drawn dashed red, "at run"), sits as a
+  small pill to the left of the flow with one output port. Wire it like any
+  other output. **+ Node → Variable** adds an `@vars` entry; select one to
+  rename it (every `{name}` in the doc follows), set its value (giving a
+  run-time input a value adds it to `@vars`), or delete it (its references
+  stay, and become run-time inputs). Variable nodes aren't nodes in the
+  `.fml`; they're a view of `@vars`.
 - **Double-click a `flow` node** to drill into the doc its `doc:` key names.
 - **Click a step badge** (top-right of a card) to spotlight that node's
   immediate `prev` / `next` neighbours and dim the rest.

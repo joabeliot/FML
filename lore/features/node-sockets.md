@@ -54,6 +54,25 @@ the double-click, so portal drill-in broke. Selecting a node *with* wires
 still rebuilds, which is harmless because only `flow` nodes use
 double-click.
 
+## FML-27: ports always on, variables as nodes (2026-10-17)
+
+Joab: ports were only visible with the node selected, so there was nothing
+to drag *to*. Now:
+
+- **Ports always render** on every node; only wires follow the Data toggle /
+  selection (`visibleDataGraph` returns the full port map).
+- **Variable nodes**: `dataGraph` also returns `vars` (each `@vars` entry and
+  each run-time input) and wires from `var:<name>` to every consumer. `var:`
+  can't appear in an FML id, so canvas ids never collide. They're a view of
+  `@vars`, never written as nodes: add = `setVar`, rename = `renameVar`
+  (moves the entry and every `{ref}` outside comments), delete = `setVar(null)`.
+  Placed in a column left of the flow, level with their first consumer;
+  a dragged one keeps its spot (same position store as nodes).
+- **Drop on an input port** repoints that reference (`{otp}` → `{code}` in
+  that node). React Flow's snapped `toHandle` decides the port, so the drop
+  needn't hit the 8px dot exactly. A drop elsewhere on the card still opens
+  the field picker.
+
 ## Not done
 
 - Unwiring by dragging a wire off. To remove one, edit the field or the

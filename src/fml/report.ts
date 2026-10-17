@@ -93,6 +93,8 @@ export interface ReportStep {
   skipped?: string;
   /** A ui step's actions, in order, and its screenshot path. */
   ui?: { actions: string[]; screenshot?: string };
+  /** What a person was asked before this step (never the answers), and how long they took. */
+  asked?: Array<{ kind: "value" | "confirm"; name?: string; waitedMs: number }>;
 }
 
 /** What, precisely, made the run red. */
@@ -102,6 +104,8 @@ export type FailureKind =
   | "capture" // a capture found nothing
   | "assert" // an `assert.*` failed
   | "ui" // a ui action (open/fill/click/press/wait) failed
+  | "ask" // a step needed a person (ask./pause) and nobody could answer
+  | "cancelled" // a person asked mid-run chose to stop
   | "unmodelled" // a status with no drawn edge
   | "ambiguous" // several edges, nothing to choose with
   | "maxSteps"; // the cycle guard tripped
@@ -202,6 +206,7 @@ export function buildReport(run: RunResult, opts: ReportOptions): RunReport {
     captures: s.captures.map(capture),
     asserts: s.asserts.map(assertion),
     ...(s.skipped ? { skipped: s.skipped } : {}),
+    ...(s.asked ? { asked: s.asked } : {}),
     ...(s.ui ? { ui: { actions: s.ui.actions.map(redact), ...(s.ui.screenshot ? { screenshot: s.ui.screenshot } : {}) } } : {}),
   });
 
@@ -265,6 +270,9 @@ function firstFailure(run: RunResult, steps: ReportStep[]): RunFailure | undefin
       nodeId: at,
       message: `"${at}" returned ${run.unmodelledStatus} and no edge leaves it for that status`,
     };
+  }
+  if (run.stoppedBecause === "cancelled") {
+    return { kind: "cancelled", nodeId: run.cancelledAt ?? at, message: "stopped by the person running it, when asked to continue" };
   }
   if (run.stoppedBecause === "ambiguous") {
     return { kind: "ambiguous", nodeId: at, message: `"${at}" has several outgoing edges and no status to pick one` };

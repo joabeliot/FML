@@ -182,6 +182,29 @@ const DATA_FLOW = `@meta
   getMe -200> income
 `;
 
+const VAR_FLOW = `@vars
+  email: a@b.c
+
+@nodes
+  login  = api
+  verify = api
+
+@node login {
+  method: POST
+  path: /login
+  body: {email}
+}
+
+@node verify {
+  method: POST
+  path: /verify
+  body: {otp}
+}
+
+@flow
+  login -200> verify
+`;
+
 const runFlow = (base: string) => `@meta
   base: ${base}
 
@@ -333,17 +356,91 @@ try {
     ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 
-  await scenario("roadmap view (FML-21)", async () => {
+  await scenario("variable nodes and always-on ports (FML-27)", async () => {
+    const { page, problems } = await open({ t: VAR_FLOW });
+    ok("input ports show with nothing selected", (await page.locator('.react-flow__handle[data-handleid^="d-in-"]').count()) === 2);
+    ok("an @vars entry is a node", await page.locator(node("var:email")).isVisible());
+    ok("so is a run-time input", await page.locator(node("var:otp")).isVisible());
+
+    await button(page, "+ Node").click();
+    await page.getByRole("button", { name: /Variable/ }).click();
+    await page.locator(node("var:var1")).waitFor();
+    ok("+ Node → Variable adds an @vars entry", /@vars\n\s+email: a@b\.c\n\s+var1:/.test(await fileText(page, "t")), await fileText(page, "t"));
+
+    await page.locator("label").filter({ hasText: /^name/ }).locator("input").fill("code");
+    await page.locator("label").filter({ hasText: /^name/ }).locator("input").press("Enter");
+    await page.locator(node("var:code")).waitFor();
+    await page.locator("label").filter({ hasText: /^value/ }).locator("input").fill("123456");
+    await page.locator("label").filter({ hasText: /^value/ }).locator("input").press("Enter");
+    await settle(page);
+    ok("the panel renames it and sets its value", (await fileText(page, "t")).includes("code: 123456"), await fileText(page, "t"));
+
+    await drag(page, handle("var:code", "d-out-code"), handle("verify", "d-in-otp"));
+    await settle(page);
+    const text = await fileText(page, "t");
+    ok("dropping its port on an input port repoints that reference", text.includes("body: {code}") && !text.includes("{otp}"), text);
+
+    await page.locator(node("var:email")).click();
+    await button(page, "Delete").click();
+    await settle(page);
+    ok("deleting a variable removes its @vars entry", !(await fileText(page, "t")).includes("email: a@b.c"));
+    ok("its reference stays, now asked at run", await page.locator(node("var:email")).isVisible());
+    ok("no console errors", problems.length === 0, problems.join(" | "));
+  });
+
+  await scenario("roadmap view and editing (FML-21, FML-28)", async () => {
     const { page, problems } = await open({ t: EDIT_FLOW });
     await page.getByRole("button", { name: /^roadmap/i }).click();
     await button(page, "Load the example roadmap").click();
     await page.locator(node("parser")).waitFor();
     ok("the example roadmap draws", (await page.locator(".react-flow__node").count()) === 20);
     ok("the frontier is tagged NEXT", (await page.getByText("next", { exact: true }).count()) === 3);
+    const rml = () => fileText(page, "roadmap.rml");
+
     await page.locator(node("stagingGate")).click();
-    await page.locator("select").last().selectOption("active");
+    await page.getByLabel("status").selectOption("active");
     await settle(page);
-    ok("changing a status writes it into the .rml", /@node stagingGate \{[^}]*status: active/.test(await fileText(page, "roadmap.rml")));
+    ok("changing a status writes it into the .rml", /@node stagingGate \{[^}]*status: active/.test(await rml()));
+
+    // + Feature with a tile selected adds what that tile unlocks.
+    await page.locator(node("rml")).click();
+    await button(page, "+ Feature").click();
+    await page.locator(node("feature1")).waitFor();
+    ok("+ Feature declares a feature", (await rml()).includes("feature1 = feature"));
+    ok("unlocked by the selected tile", (await rml()).includes("rml -> feature1"));
+
+    const idField = page.locator("label").filter({ hasText: /^id/ }).locator("input");
+    await idField.fill("exports");
+    await idField.press("Enter");
+    await page.locator(node("exports")).waitFor();
+    ok("renaming in the panel renames it everywhere", (await rml()).includes("rml -> exports") && !(await rml()).includes("feature1"));
+    const desc = page.locator("label").filter({ hasText: /^description/ }).locator("textarea");
+    await desc.fill("Export a roadmap as an image");
+    await desc.blur();
+    await settle(page);
+    ok("fields write into its @node block", /@node exports \{[^}]*description: Export a roadmap as an image/.test(await rml()), await rml());
+    await page.locator("label").filter({ hasText: /^kind/ }).locator("select").selectOption("milestone");
+    await settle(page);
+    ok("kind switches feature ↔ milestone", (await rml()).includes("exports = milestone"));
+
+    // Drag a tile's gold handle onto another: that one now depends on it.
+    await page.locator(node("drift")).hover();
+    await drag(page, `${node("drift")} .react-flow__handle[data-handleid="link"]`, node("exports"));
+    await settle(page);
+    ok("dragging the link handle onto a tile adds a dependency", (await rml()).includes("drift -> exports"), await rml());
+    await page.locator(node("exports")).hover();
+    await drag(page, `${node("exports")} .react-flow__handle[data-handleid="link"]`, node("drift"));
+    await settle(page);
+    ok("a link that would make a loop is refused", !(await rml()).includes("exports -> drift"));
+
+    await page.locator(node("exports")).click();
+    await page.keyboard.press("Delete");
+    await settle(page);
+    ok("Delete removes the tile and its links", !(await rml()).includes("exports"));
+    await page.keyboard.press("Control+z");
+    await settle(page);
+    ok("⌘Z / Ctrl+Z brings it back", (await rml()).includes("exports = milestone"));
+
     for (let i = 0; i < 2; i++) {
       await page.getByRole("button", { name: /^flows$/i }).click();
       await page.locator(node("Login")).waitFor();
@@ -351,6 +448,18 @@ try {
       await page.locator(node("parser")).waitFor();
     }
     ok("switching views back and forth is clean (no stray node types)", problems.length === 0, problems.join(" | "));
+  });
+
+  await scenario("a new roadmap from scratch", async () => {
+    const { page, problems } = await open({ t: EDIT_FLOW });
+    await page.getByRole("button", { name: /^roadmap/i }).click();
+    await button(page, "New roadmap").click();
+    await page.locator(node("start")).waitFor();
+    await page.locator(node("start")).click();
+    await button(page, "+ Feature").click();
+    await page.locator(node("feature1")).waitFor();
+    ok("a new roadmap starts with one milestone and grows from it", (await fileText(page, "roadmap.rml")).includes("start -> feature1"));
+    ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 
   await scenario("in-app run against a local API, ui steps skipped", async () => {
@@ -363,6 +472,39 @@ try {
     const marks = await page.locator("span").filter({ hasText: /^[✔✖–]$/ }).allTextContents();
     ok("both api steps pass through the dev proxy", marks.filter((m) => m === "✔").length === 2, marks.join(""));
     ok("the ui step is skipped, not passed or failed", marks.includes("–") && !marks.includes("✖"), marks.join(""));
+    ok("no console errors", problems.length === 0, problems.join(" | "));
+  });
+
+  await scenario("a run that stops to ask a person (FML-26)", async () => {
+    const flow = runFlow(api)
+      .replace("  path: /login\n", "  path: /login\n  ask.password: Your password\n")
+      .replace("  path: /me\n", "  path: /me\n  pause: Check the token went through\n")
+      .replace("  me -200> browse\n  browse -> Home\n", "  me -200> Home\n");
+    const { page, problems } = await open({ t: flow });
+    const dialog = page.getByRole("dialog", { name: "The run is waiting for you" });
+
+    await button(page, "▶ Run").click();
+    await dialog.waitFor({ timeout: 10_000 });
+    ok("an asked value isn't requested up front — the run asks at the node", (await dialog.textContent())?.includes("Your password") === true);
+    ok("the bar says it's waiting", await page.getByText("WAITING FOR YOU").isVisible());
+    ok("a secret-looking answer is masked", (await dialog.locator("input").getAttribute("type")) === "password");
+    await dialog.locator("input").fill(PASSWORD);
+    await dialog.locator("input").press("Enter");
+    await page.getByText("Check the token went through").waitFor({ timeout: 10_000 });
+    const pauseText = (await dialog.textContent()) ?? "";
+    ok("then the pause, at the next node", /paused · me/.test(pauseText), pauseText);
+    await dialog.getByRole("button", { name: "Continue" }).click();
+    await button(page, "▶ Run").waitFor({ timeout: 30_000 });
+    await settle(page);
+    ok("answered, the run passes", await page.getByText("PASS", { exact: true }).isVisible());
+
+    await button(page, "▶ Run").click();
+    await dialog.locator("input").fill(PASSWORD);
+    await dialog.locator("input").press("Enter");
+    await dialog.getByRole("button", { name: "Stop run" }).click();
+    await button(page, "▶ Run").waitFor({ timeout: 30_000 });
+    ok("Stop run ends it there, saying where", await page.getByText("you stopped it at me").isVisible());
+    ok("…as a FAIL, not a pass", await page.getByText("FAIL", { exact: true }).isVisible());
     ok("no console errors", problems.length === 0, problems.join(" | "));
   });
 

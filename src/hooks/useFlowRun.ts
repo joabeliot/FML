@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { requiredInputs, runFlow, type FmlDoc, type RunResult, type StepResult } from "../fml/index.ts";
+import { requiredInputs, runFlow, type AskRequest, type FmlDoc, type RunResult, type StepResult } from "../fml/index.ts";
 import { browserTransport } from "../lib/httpTransport.ts";
 
 /** What one node is doing right now, as far as the canvas is concerned. */
@@ -50,6 +50,10 @@ export interface FlowRun {
    * speed the camera would just thrash.
    */
   focus: FocusRequest | null;
+  /** A question the run is waiting on a person for (FML-26), or null. */
+  asking: AskRequest | null;
+  /** Answer it — the value (`""` to carry on past a pause), or null to stop the run. */
+  answer: (value: string | null) => void;
   /** The live variable store, so captures can be watched filling in. */
   vars: Record<string, string>;
   result: RunResult | null;
@@ -85,6 +89,9 @@ export function useFlowRun(): FlowRun {
   const [vars, setVars] = useState<Record<string, string>>({});
   const [result, setResult] = useState<RunResult | null>(null);
   const [speed, setSpeed] = useState<RunSpeed>("watch");
+  const [asking, setAsking] = useState<AskRequest | null>(null);
+  const answerRef = useRef<((value: string | null) => void) | null>(null);
+  const answer = useCallback((value: string | null) => answerRef.current?.(value), []);
 
   const abort = useRef<AbortController | null>(null);
   // Read inside the engine's callbacks, which are created once per run — a ref
@@ -135,6 +142,28 @@ export function useFlowRun(): FlowRun {
           transport: browserTransport,
           vars: inputs,
           signal: controller.signal,
+
+          // `ask.<name>` / `pause` (FML-26): hold the run until the dialog answers.
+          ask: (req, signal) =>
+            new Promise<string | null>((resolve, reject) => {
+              const onAbort = () => {
+                settle();
+                reject(new DOMException("stopped", "AbortError"));
+              };
+              const settle = () => {
+                answerRef.current = null;
+                setAsking(null);
+                signal?.removeEventListener("abort", onAbort);
+              };
+              answerRef.current = (value) => {
+                settle();
+                if (value !== null && req.kind === "value") setVars((prev) => ({ ...prev, [req.name!]: value }));
+                resolve(value);
+              };
+              signal?.addEventListener("abort", onAbort, { once: true });
+              look([req.nodeId]);
+              setAsking(req);
+            }),
 
           onStepStart: async (node) => {
             // Settle on the node about to act — including a page/decision the
@@ -205,6 +234,8 @@ export function useFlowRun(): FlowRun {
     takenEdges,
     visited,
     focus,
+    asking,
+    answer,
     vars,
     result,
     speed,

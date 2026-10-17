@@ -41,7 +41,7 @@ export const RML_STATUSES = ["pending", "active", "done"] as const;
 export type RmlStatus = (typeof RML_STATUSES)[number];
 
 /** The keys an RML node understands. Nothing is required — `x = feature` is a sketch. */
-export const RML_KEYS = ["status", "description", "area", "fml", "ticket", "note", "label"] as const;
+export const RML_KEYS = ["status", "description", "area", "icon", "fml", "ticket", "note", "label"] as const;
 
 export const RML_VOCABULARY: FmlVocabulary = {
   names: RML_TYPES,

@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "node src/fml/parse.test.ts && node src/fml/stats.test.ts && node src/fml/variables.test.ts && node src/fml/run.test.ts && node src/fml/lint.test.ts && node src/fml/report.test.ts && node src/fml/drift.test.ts && node src/rml/rml.test.ts && node src/lib/fmlEdit.test.ts && node src/lib/fmlStructure.test.ts && node src/lib/dataWires.test.ts && node scripts/cli.test.ts",
+    "test": "node src/fml/parse.test.ts && node src/fml/stats.test.ts && node src/fml/variables.test.ts && node src/fml/run.test.ts && node src/fml/lint.test.ts && node src/fml/report.test.ts && node src/fml/drift.test.ts && node src/rml/rml.test.ts && node src/lib/radialLayout.test.ts && node src/lib/fmlEdit.test.ts && node src/lib/fmlStructure.test.ts && node src/lib/dataWires.test.ts && node scripts/cli.test.ts",
     "demo": "node scripts/demo.ts",
     "run-flow": "node scripts/run.ts",
     "drift": "node scripts/drift.ts",

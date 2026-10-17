@@ -133,13 +133,21 @@ const has = (issues: LintIssue[], nodeId: string, needle: string): boolean =>
 
 // 6. every shipped example lints clean
 {
-  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml", "examples/bytes.fml", "examples/ui.fml"];
+  const clean = ["examples/run.fml", "examples/assertions.fml", "examples/conditional-get.fml", "examples/bytes.fml", "examples/ui.fml", "examples/ask.fml"];
   for (const file of clean) {
     // Read through parse so @meta/@vars are real; no @fof in these.
     const src = await import("node:fs").then((fs) => fs.readFileSync(file, "utf8"));
     const issues = lintDoc(parse(src, { strict: true }).doc).filter((i) => i.severity !== "info");
     eq(`${file} lints clean`, issues, []);
   }
+}
+
+// asking a person (FML-26): ask.<name> supplies {name}; pause is a key on every type
+{
+  const doc = parse(`@nodes\n  A = page\n  B = decision\n@node A {\n  ask.code: The code\n  pause: ok?\n}\n@node B {\n  condition: {code} == 1\n  pause: sure?\n}\n`, { strict: false }).doc;
+  eq("ask/pause are standard keys, and an asked name counts as supplied", lintDoc(doc), []);
+  const blank = parse(`@nodes\n  A = page\n@node A {\n  ask.: x\n}\n`, { strict: false }).doc;
+  eq("an ask with no name is flagged", lintDoc(blank).map((i) => i.key), ["ask."]);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

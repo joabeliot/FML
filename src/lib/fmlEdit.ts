@@ -348,3 +348,92 @@ export function setEdgeNote(
   lines.splice(hit.index, span, ...replacement);
   return lines.join("\n");
 }
+
+// -- @vars (FML-27) -----------------------------------------------------------
+
+const VAR_LINE = /^(\s+)([A-Za-z0-9_.-]+)(\s*:\s*)(.*)$/;
+
+/** The doc's `@vars` header line and its last entry, or null when it has none. */
+function varsSection(lines: string[], start: number, end: number): { header: number; last: number } | null {
+  for (let i = start; i < end; i++) {
+    if (!/^\s*@vars\s*$/.test(lines[i]!)) continue;
+    let last = i;
+    for (let j = i + 1; j < end; j++) {
+      if (/^\s*@/.test(lines[j]!)) break;
+      if (VAR_LINE.test(lines[j]!)) last = j;
+    }
+    return { header: i, last };
+  }
+  return null;
+}
+
+/**
+ * Add, change or (with `null`) remove one `@vars` entry. A new entry goes at
+ * the end of the section; with no section, one is opened ahead of the doc's
+ * first `@nodes` / `@node` / `@flow`. Every other line is left alone.
+ */
+export function setVar(src: string, docName: string, name: string, value: string | null): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return src;
+  const lines = src.split("\n");
+  const { start, end } = docSpan(lines, docName);
+  const section = varsSection(lines, start, end);
+  const clean = value?.replace(/[\r\n]+/g, " ").trim();
+
+  if (section) {
+    for (let i = section.header + 1; i <= section.last; i++) {
+      const m = VAR_LINE.exec(lines[i]!);
+      if (!m || m[2] !== name) continue;
+      if (clean === undefined) lines.splice(i, 1);
+      else lines[i] = `${m[1]}${name}${m[3]}${clean}`;
+      return lines.join("\n");
+    }
+    if (clean === undefined) return src;
+    const sample = VAR_LINE.exec(lines[section.last]!);
+    lines.splice(section.last + 1, 0, `${sample?.[1] ?? "  "}${name}: ${clean}`);
+    return lines.join("\n");
+  }
+
+  if (clean === undefined) return src;
+  let at = -1;
+  for (let i = start; i < end; i++) {
+    if (/^\s*@(nodes|node|flow)\b/.test(lines[i]!)) {
+      at = i;
+      break;
+    }
+  }
+  if (at === -1) {
+    lines.splice(end, 0, ...(end > start && lines[end - 1]!.trim() !== "" ? [""] : []), "@vars", `  ${name}: ${clean}`);
+  } else {
+    lines.splice(at, 0, "@vars", `  ${name}: ${clean}`, "");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Rename a variable: its `@vars` entry (if it has one) and every `{from}` in
+ * the doc becomes `{to}`. Comments are left as written.
+ */
+export function renameVar(src: string, docName: string, from: string, to: string): string {
+  if (from === to || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(to)) return src;
+  const lines = src.split("\n");
+  const { start, end } = docSpan(lines, docName);
+  const section = varsSection(lines, start, end);
+  if (section) {
+    for (let i = section.header + 1; i <= section.last; i++) {
+      const m = VAR_LINE.exec(lines[i]!);
+      if (m && m[2] === to) return src; // taken
+    }
+    for (let i = section.header + 1; i <= section.last; i++) {
+      const m = VAR_LINE.exec(lines[i]!);
+      if (m && m[2] === from) lines[i] = `${m[1]}${to}${m[3]}${m[4]}`;
+    }
+  }
+  const ref = new RegExp(`\\{${from}\\}`, "g");
+  for (let i = start; i < end; i++) {
+    const line = lines[i]!;
+    const hash = line.search(/(^|\s)#/);
+    const code = hash === -1 ? line : line.slice(0, hash);
+    lines[i] = code.replace(ref, `{${to}}`) + (hash === -1 ? "" : line.slice(hash));
+  }
+  return lines.join("\n");
+}

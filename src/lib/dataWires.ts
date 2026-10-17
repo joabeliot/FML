@@ -11,13 +11,14 @@
 //                 a name used in both a header and the body is one port
 //   wire          capturing node's output → consuming node's input, per name
 //
-// A name supplied by `@vars` has an input port but no wire (its value is in
-// the file, not produced by a node); a name nothing supplies is a run-time
-// input, also wire-less, and flagged as such on the port.
+// Variables (FML-27) are nodes too, on the canvas only: every `@vars` entry
+// and every run-time input (a name nothing supplies) gets a variable node
+// with one output port, and its wires run to the nodes that spend it. Those
+// nodes never enter the .fml as nodes — editing one edits `@vars`.
 
 import { resolveVariables, varsInValue, type FmlDoc } from "../fml/index.ts";
 
-export type InputSource = "capture" | "vars" | "input";
+export type InputSource = "capture" | "ask" | "vars" | "input";
 
 export interface InputPort {
   name: string;
@@ -38,10 +39,24 @@ export interface DataWire {
   name: string;
 }
 
+/** A variable node: an `@vars` default, or a value supplied when the flow runs. */
+export interface VarDef {
+  name: string;
+  source: "vars" | "input";
+  /** The `@vars` default; absent for a run-time input. */
+  value?: string;
+}
+
 export interface DataGraph {
   ports: Map<string, NodePorts>;
   wires: DataWire[];
+  vars: VarDef[];
 }
+
+/** Canvas ids for variable nodes — `:` can't appear in an FML id, so they never collide. */
+export const varNodeId = (name: string): string => `var:${name}`;
+export const isVarNodeId = (id: string): boolean => id.startsWith("var:");
+export const varNameOf = (id: string): string => id.slice("var:".length);
 
 /** Handle ids — distinct from the control-flow `s-*` / `t-*` handles. */
 export const outHandle = (name: string): string => `d-out-${name}`;
@@ -53,13 +68,15 @@ export function dataGraph(doc: FmlDoc): DataGraph {
   const resolved = resolveVariables(doc);
   const ports = new Map<string, NodePorts>();
   const wires: DataWire[] = [];
+  const vars: VarDef[] = Object.entries(doc.vars).map(([name, value]) => ({ name, source: "vars", value }));
 
   for (const node of doc.nodes) {
     const outputs: string[] = [];
     const names: string[] = [];
     for (const [key, value] of Object.entries(node.data)) {
-      if (key.startsWith("capture.")) {
-        const name = key.slice("capture.".length);
+      if (key.startsWith("capture.") || key.startsWith("ask.")) {
+        // An ask (FML-26) supplies its name like a capture does — a person types it.
+        const name = key.slice(key.indexOf(".") + 1);
         if (name && !outputs.includes(name)) outputs.push(name);
         continue; // a capture's value is a response path, not a reference
       }
@@ -70,13 +87,18 @@ export function dataGraph(doc: FmlDoc): DataGraph {
       const r = resolved.get(name);
       if (!r) return { name, source: "input" };
       if (r.source === "vars") return { name, source: "vars" };
-      return { name, source: "capture", ...(r.capturedBy ? { from: r.capturedBy } : {}) };
+      return { name, source: r.source, ...(r.capturedBy ? { from: r.capturedBy } : {}) };
     });
 
     for (const input of inputs) {
+      if (input.source !== "capture" && input.source !== "ask") {
+        if (input.source === "input" && !vars.some((v) => v.name === input.name)) vars.push({ name: input.name, source: "input" });
+        wires.push({ id: `data_${varNodeId(input.name)}_${node.id}_${input.name}`, source: varNodeId(input.name), target: node.id, name: input.name });
+        continue;
+      }
       // A node spending a value it captured itself (e.g. an assert on its own
       // capture) has nothing to draw between two places.
-      if (input.source !== "capture" || !input.from || input.from === node.id) continue;
+      if (!input.from || input.from === node.id) continue;
       wires.push({
         id: `data_${input.from}_${node.id}_${input.name}`,
         source: input.from,
@@ -88,37 +110,20 @@ export function dataGraph(doc: FmlDoc): DataGraph {
     if (inputs.length > 0 || outputs.length > 0) ports.set(node.id, { inputs, outputs });
   }
 
-  return { ports, wires };
+  for (const v of vars) ports.set(varNodeId(v.name), { inputs: [], outputs: [v.name] });
+  return { ports, wires, vars };
 }
 
 /**
- * The part of the graph to draw: everything when the data layer is on,
- * otherwise only the selected node's wires (and the ports at either end of
- * them, plus its own) — so selecting a node always shows where its values
- * come from and go, without the whole canvas filling with wires.
+ * The part of the graph to draw. Ports always show (FML-27: you connect to
+ * them, so they have to be there to aim at); wires are everything with the
+ * data layer on, otherwise only the selected node's, so selecting a node
+ * shows where its values come from and go without the canvas filling up.
  */
 export function visibleDataGraph(graph: DataGraph, allOn: boolean, selected: string | null): DataGraph {
   if (allOn) return graph;
-  if (!selected) return { ports: new Map(), wires: [] };
-
-  const wires = graph.wires.filter((w) => w.source === selected || w.target === selected);
-  const ports = new Map<string, NodePorts>();
-  const own = graph.ports.get(selected);
-  if (own) ports.set(selected, own);
-  for (const w of wires) {
-    const other = w.source === selected ? w.target : w.source;
-    const full = graph.ports.get(other);
-    if (!full) continue;
-    const prev = ports.get(other) ?? { inputs: [], outputs: [] };
-    if (w.target === other) {
-      const input = full.inputs.find((i) => i.name === w.name);
-      if (input && !prev.inputs.some((i) => i.name === w.name)) prev.inputs.push(input);
-    } else if (!prev.outputs.includes(w.name)) {
-      prev.outputs.push(w.name);
-    }
-    ports.set(other, prev);
-  }
-  return { ports, wires };
+  const wires = selected ? graph.wires.filter((w) => w.source === selected || w.target === selected) : [];
+  return { ports: graph.ports, wires, vars: graph.vars };
 }
 
 /** Keys a `{name}` can be appended to — not the ones whose value isn't free text. */

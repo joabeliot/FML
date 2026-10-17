@@ -12,7 +12,7 @@
 // Zero dependencies, like the rest of `src/fml/`.
 
 import { parseAssertion } from "./assert.ts";
-import { EXEC_KEY_PREFIXES, isKnownType, nodeTypeSpec } from "./nodeTypes.ts";
+import { ANY_NODE_KEYS, EXEC_KEY_PREFIXES, isKnownType, nodeTypeSpec } from "./nodeTypes.ts";
 import { isStatusLabel } from "./run.ts";
 import type { FmlDoc } from "./types.ts";
 import { varsInValue } from "./variables.ts";
@@ -61,6 +61,7 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
   for (const node of doc.nodes) {
     for (const key of Object.keys(node.data)) {
       if (key.startsWith("capture.")) captured.set(key.slice("capture.".length), node.id);
+      if (key.startsWith("ask.")) captured.set(key.slice("ask.".length), node.id); // asked mid-run (FML-26)
     }
   }
 
@@ -72,7 +73,7 @@ export function lintDoc(doc: FmlDoc): LintIssue[] {
     // 1. Keys outside the standard — the typo catcher. Only meaningful for a
     //    type we actually have a standard for.
     if (spec) {
-      const allowed = new Set([...spec.expects, ...spec.optional, "label"]);
+      const allowed = new Set([...spec.expects, ...spec.optional, ...ANY_NODE_KEYS, "label"]);
       for (const key of Object.keys(node.data)) {
         if (allowed.has(key)) continue;
         const dot = key.indexOf(".");

@@ -14,15 +14,16 @@ import { FmlNode } from "./nodes/FmlNode.tsx";
 import { BubbleNode } from "./nodes/BubbleNode.tsx";
 import { FlowEdge } from "./edges/FlowEdge.tsx";
 import { DataEdge } from "./edges/DataEdge.tsx";
-import { isDataHandle, nameOfHandle } from "../lib/dataWires.ts";
+import { isDataHandle, isVarNodeId, nameOfHandle } from "../lib/dataWires.ts";
 import { useForceLayout } from "../hooks/useForceLayout.ts";
 import { nodeSize } from "../lib/layout.ts";
 import { savePositions } from "../lib/nodePositions.ts";
+import { VarNode } from "./nodes/VarNode.tsx";
 import { TRACE_IN, TRACE_OUT } from "../lib/nodeStyle.ts";
 import type { FmlFlowNode, FmlNodeData } from "../types/chart.ts";
 import type { Selection } from "./PropertyPanel.tsx";
 
-const nodeTypes = { fml: FmlNode, bubble: BubbleNode };
+const nodeTypes = { fml: FmlNode, bubble: BubbleNode, var: VarNode };
 
 /** Ceiling on how close the run camera gets — comfortable reading distance. */
 const FOLLOW_ZOOM = 1.15;
@@ -94,7 +95,23 @@ interface Props {
    * A data wire was dragged from `source`'s `capture.<name>` port and dropped
    * on `target` (anywhere on its card) at screen point `at` — FML-20.
    */
-  onDataDrop?: (source: string, name: string, target: string, at: { x: number; y: number }) => void;
+  /**
+   * A data wire dropped on a node: on one of its input ports (`port` is that
+   * port's name) or anywhere else on the card.
+   */
+  onDataDrop?: (source: string, name: string, target: string, at: { x: number; y: number }, port?: string) => void;
+}
+
+/** The input port on `nodeId` within 24px of a screen point, if any — a near miss on an 8px dot still counts. */
+function nearestInputPort(nodeId: string, x: number, y: number): string | undefined {
+  const card = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`);
+  let best: { id: string; d: number } | undefined;
+  for (const h of card?.querySelectorAll<HTMLElement>('.react-flow__handle[data-handleid^="d-in-"]') ?? []) {
+    const r = h.getBoundingClientRect();
+    const d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y);
+    if (d <= 24 && (!best || d < best.d)) best = { id: h.dataset.handleid!, d };
+  }
+  return best?.id;
 }
 
 export function FlowCanvas({
@@ -374,8 +391,17 @@ export function FlowCanvas({
           const target = el?.closest<HTMLElement>(".react-flow__node")?.dataset.id;
           if (!target) return;
           if (isDataHandle(from.id)) {
-            if (target !== from.nodeId) onDataDrop?.(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY });
-          } else {
+            // A variable node has nothing to receive.
+            if (target === from.nodeId || isVarNodeId(target)) return;
+            // The port React Flow snapped to (it snaps within a radius, so the
+            // pointer needn't be exactly on the dot), else whatever's under it.
+            // (Only a data input counts: a control-flow handle can sit right
+            // beside a port, and snapping to it made the drop miss.)
+            const snapped = state.toHandle?.nodeId === target && state.toHandle.id?.startsWith("d-in-") ? state.toHandle.id : undefined;
+            const portId = snapped ?? nearestInputPort(target, point.clientX, point.clientY);
+            const port = portId?.startsWith("d-in-") ? nameOfHandle(portId) : undefined;
+            onDataDrop?.(from.nodeId, nameOfHandle(from.id!), target, { x: point.clientX, y: point.clientY }, port);
+          } else if (!isVarNodeId(target)) {
             onConnect?.(from.nodeId, target);
           }
         }}

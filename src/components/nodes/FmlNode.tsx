@@ -233,6 +233,7 @@ const portTop = (i: number, n: number): string => `${((i + 1) / (n + 1)) * 100}%
 
 const PORT_TITLE: Record<string, string> = {
   capture: "captured by an earlier node",
+  ask: "asked of a person mid-run",
   vars: "an @vars default — set in the file",
   input: "a run-time input — nothing in the file supplies it",
 };
@@ -259,7 +260,7 @@ function DataPorts({ ports }: { ports: NodePorts }) {
           style={{
             top: portTop(i, ports.inputs.length),
             borderColor: p.source === "input" ? "var(--color-danger)" : "var(--color-data)",
-            background: p.source === "capture" ? "var(--color-data)" : "var(--color-bg)",
+            background: p.source === "capture" || p.source === "ask" ? "var(--color-data)" : "var(--color-bg)",
           }}
           title={`{${p.name}} — ${PORT_TITLE[p.source]}${p.from ? ` (${p.from})` : ""}`}
         >

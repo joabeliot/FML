@@ -67,7 +67,9 @@ export function RunBar({ run, open, onToggle, onSelectNode, selectedNodeId, onCl
   const failed = run.steps.find((s) => !s.ok);
 
   const verdict =
-    run.status === "running"
+    run.asking
+      ? { text: "WAITING FOR YOU", color: "var(--color-warn)" }
+      : run.status === "running"
       ? { text: "RUNNING", color: "var(--color-ink-dim)" }
       : run.ok === null
         ? { text: "—", color: "var(--color-ink-mute)" }
@@ -89,6 +91,8 @@ export function RunBar({ run, open, onToggle, onSelectNode, selectedNodeId, onCl
             ? "hit the step limit — the flow probably loops"
             : res.stoppedBecause === "aborted"
               ? "stopped"
+              : res.stoppedBecause === "cancelled"
+              ? `you stopped it at ${res.cancelledAt}`
               : "stopped at the first failure";
 
   return (
